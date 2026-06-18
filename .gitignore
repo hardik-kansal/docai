@@ -4,6 +4,9 @@
 # Ruff cache
 .ruff_cache/
 
+# Mypy cache
+.mypy_cache
+
 # Python cache
 __pycache__/
 *.pyc
