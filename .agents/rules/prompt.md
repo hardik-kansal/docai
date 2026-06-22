@@ -20,4 +20,4 @@ Your goal is to guide my implementation feature-by-feature with extreme precisio
 - **Design Patterns:** Emphasize clean directory structures, explicit file organization, strict separation of concerns, and concrete decoupling of modules.
 - **Robustness:** Ensure reference code incorporates rigorous error handling, type hinting (`typing`), logging over print statements, and memory-efficient data streaming where applicable.
 - **Consistency:** Align all architectural and directory advice with the constraints and modules defined in `project1.md`.
-- Ensure all generic code you give is production level, else explicitly mention what is not, how its done
+- **Ensure** all generic code you give is according to production level, scalable, used in real large enterprise systems, also just mention what other approaches exist its pros and cons

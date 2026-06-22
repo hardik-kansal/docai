@@ -25,18 +25,17 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-
-_JWT_SECRET = settings._JWT_SECRET
-_JWT_ALGORITHM = settings._JWT_ALGORITHM
-_TOKEN_EXPIRY_MINUTES = settings._TOKEN_EXPIRY_MINUTES
-_ISSUER = settings._ISSUER
+JWT_ALGORITHM = settings().JWT_ALGORITHM
+JWT_SECRET = settings().JWT_SECRET
+TOKEN_EXPIRY_MINUTES = settings().TOKEN_EXPIRY_MINUTES
+ISSUER = settings().ISSUER
 _bearer_scheme = HTTPBearer()
 
 
 # ---------------------------------------------------------------------------
 # Domain models
 # ---------------------------------------------------------------------------
-class AccessScope(StrEnum):  # now all class var must be string
+class AccessScope(StrEnum):  # now all eunum values must be string
     """Document-access scopes that map to metadata filters in retrieval."""
 
     LEGAL = "legal"
@@ -46,9 +45,11 @@ class AccessScope(StrEnum):  # now all class var must be string
 
 
 # When inherit Enum, every variable is now enum type
-# each instance is declared with a type,can be only one at a time like a enum
 # s=AccesScope.NAME its an enum object, but value is string
-# cant compare directly thats why used StrEnum, s have s.name,s.value
+# cant compare directly thats why used StrEnum, which is just a wrapper actual object is still enum
+# print(s) gives s.value(legal) which is str, s.name is also str (LEGAL)
+# s is enum class object, but now due to strEnum can be used to compare with str directly
+# which in fact still possible, but static linters like ruff might not allow
 
 
 class TokenPayload(BaseModel):
@@ -75,19 +76,19 @@ def create_access_token(
     """Mint a signed JWT with embedded access scopes."""
     now = datetime.now(timezone.utc)  # datetime.now() uses local time
     # also jwt compares with server utc time
-    expire = now + (expires_delta or timedelta(minutes=_TOKEN_EXPIRY_MINUTES))
+    expire = now + (expires_delta or timedelta(minutes=TOKEN_EXPIRY_MINUTES))
 
     payload = {
         "sub": user_id,
         "scopes": [s.value for s in scopes],
         "exp": expire,
         "iat": now,  # issued at
-        "iss": _ISSUER,
+        "iss": ISSUER,
     }
     # jwt library when decode, looks for certain names predrefined like
     # sub,exp,iat,iss(issuer) changing these we lose native automation features
     # like exp check, hash check
-    token = jwt.encode(payload, _JWT_SECRET, algorithm=_JWT_ALGORITHM)
+    token = jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
     logger.info("Token issued for user=%s scopes=%s", user_id, scopes)
     return token
 
@@ -102,9 +103,9 @@ def _decode_token(raw_token: str) -> TokenPayload:
     try:
         data = jwt.decode(
             raw_token,
-            _JWT_SECRET,
-            algorithms=[_JWT_ALGORITHM],  # very imp, if not provide attacks possible
-            issuer=_ISSUER,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],  # very imp, if not provide attacks possible
+            issuer=ISSUER,
         )
     except jwt.ExpiredSignatureError:
         logger.warning("Expired token presented")
