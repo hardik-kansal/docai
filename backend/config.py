@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str
     TOKEN_EXPIRY_MINUTES: int = 60  # not required, have default value
     ISSUER: str
+    REDIS_URL: str
 
 
 @lru_cache(maxsize=1)
@@ -16,6 +17,6 @@ def settings():
     return Settings()
 
 
-# can be used with Depends(callable settings now)
+# can be used with Depends(callable settings now) insde tree of func called by fastapi
 # env read only once, then returns same object cached, like if do settings=Settings()
 # helps in testing by mocking it, i.e .env is not read
