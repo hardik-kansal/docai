@@ -10,6 +10,8 @@ class Settings(BaseSettings):
     TOKEN_EXPIRY_MINUTES: int = 60  # not required, have default value
     ISSUER: str
     REDIS_URL: str
+    pgURL: str
+    is_prod: str
 
 
 @lru_cache(maxsize=1)

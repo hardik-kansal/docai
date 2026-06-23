@@ -1,7 +1,7 @@
 from .dependencies import get_token_store
 from .token_store import TokenStore
 from .cookies import REFRESH_COOKIE, set_auth_cookies, clear_auth_cookies
-from .schemas import LoginRequest
+from ..schemas import LoginRequest
 from . import tokens
 
 from fastapi import HTTPException, APIRouter, Response, Request, Depends

@@ -15,7 +15,7 @@ from __future__ import annotations
 from ..config import settings
 import logging
 from datetime import datetime, timedelta, timezone
-from .schemas import AccessScope
+from ..schemas import AccessScope
 import uuid
 from .cookies import ACCESS_COOKIE, REFRESH_COOKIE
 import jwt
