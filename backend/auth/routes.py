@@ -1,26 +1,37 @@
 from .dependencies import get_token_store
 from .token_store import TokenStore
 from .cookies import REFRESH_COOKIE, set_auth_cookies, clear_auth_cookies
-from ..schemas import LoginRequest
 from . import tokens
 
 from fastapi import HTTPException, APIRouter, Response, Request, Depends
-
-
+from pydantic import BaseModel, Field
+from .services import AuthService
+from ..db.dependencies import get_auth_service
 import logging
 from typing import Annotated
 
 logger = logging.getLogger(__name__)
 
 
+class LoginRequest(BaseModel):
+    username: str = Field(default=..., max_length=10, min_length=1)
+    pwd: str = Field(default=..., max_length=10, min_length=5)
+
+
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
-@router.post("/signup")  # username, pwd, create user_id, scopes
-async def signup(credentials: LoginRequest):
-    # check if username exits or not
-    # add User to db
-    return {"meassage": "signup success"}
+@router.post("/signup")
+async def signup(
+    credentials: LoginRequest,
+    authService: Annotated[AuthService, Depends(get_auth_service)],
+):
+    try:
+        user = await authService.register_user(credentials.username, credentials.pwd)
+    except ValueError as exc:
+        # 409 is req is valid but interfer with current status of server
+        raise HTTPException(status_code=409, detail=str(exc))
+    return {"message": "signup success", "user_id": user.user_id}
 
 
 # fastapi is coroutine object which is run when server is started
@@ -31,24 +42,30 @@ async def login(
     credentials: LoginRequest,
     response: Response,  # this is injected like dependency by fastapi
     token_store: Annotated[TokenStore, Depends(get_token_store)],
+    authService: Annotated[AuthService, Depends(get_auth_service)],
 ):
-    # Verify credentials (your user store / bcrypt)
-    user = None  # await verify_credentials(credentials.username, credentials.pwd)
-    access_jwt, access_jti, refresh_jwt, refresh_jti = tokens.create_token_pair(
-        user_id=user.user_id,
-        scopes=user.scopes,
-    )
-
-    # Store refresh in Redis
-    await token_store.store_refresh(
-        jti=refresh_jti,
-        user_id=user.user_id,
-        scopes=[s.value for s in user.scopes],
-        ttl_seconds=REFRESH_COOKIE.max_age,
-    )
+    try:
+        user = await authService.verify_credentials(
+            credentials.username, credentials.pwd
+        )
+        access_jwt, access_jti, refresh_jwt, refresh_jti = tokens.create_token_pair(
+            user_id=user.user_id,
+            scopes=user.scopes,
+        )
+        # Store refresh in Redis
+        await token_store.store_refresh(
+            jti=refresh_jti,
+            user_id=user.user_id,
+            scopes=[s.value for s in user.scopes],
+            ttl_seconds=REFRESH_COOKIE.max_age,
+        )
+    except (
+        ValueError
+    ):  # catch only value error if something else wrong would never know
+        raise HTTPException(status_code=401, detail="invalid credentials")
     # Set cookies
     set_auth_cookies(response, access_jwt, refresh_jwt)
-    return {"message": "authenticated", "user_id": user.id}
+    return {"message": "authenticated", "user_id": user.user_id}
 
 
 @router.post("/refresh")

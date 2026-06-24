@@ -27,7 +27,7 @@ async def lifespan(app: FastAPI):
     # before startup
     set_redis_pool(_redis_pool)
     _pool = await asyncpg.create_pool(
-        settings().pgURL,
+        settings().DB_URL,
         min_size=5,
         # first 5 connections immediately
         # even if nobody using them
@@ -51,15 +51,3 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
-
-
-"""
-
-sudo systemctl start/stop postgresql 
-sudo -u postgres psql -> run psql cli with postgres as user(default, no pwd asked)
-CREATE USER hardik WITH PASSWORD 'mypassword';
-GRANT ALL PRIVILEGES ON DATABASE project1 TO hardik;
-\q
-psql -h localhost -U hardik -d project1 ->test connection
-
-"""
