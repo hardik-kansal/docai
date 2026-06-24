@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from fastapi import Response
+from ..config import settings
 
 
 @dataclass(frozen=True, slots=True)
@@ -13,7 +14,8 @@ class CookieConfig:
     max_age: int  # seconds
     path: str
     httponly: bool = True
-    secure: bool = True  # False only in local dev over HTTP
+    secure: bool = True if settings().is_prod else False
+    # since works on localhost for localdev
     samesite: str = "lax"
 
 
@@ -31,7 +33,24 @@ REFRESH_COOKIE = CookieConfig(
 )
 
 
-def set_auth_cookies(
+def set_access_cookie(
+    response: Response,
+    access_jwt: str,
+) -> None:
+    """Set access cookies on a FastAPI Response."""
+
+    response.set_cookie(
+        key=ACCESS_COOKIE.key,
+        value=access_jwt,
+        max_age=ACCESS_COOKIE.max_age,
+        path=ACCESS_COOKIE.path,
+        httponly=ACCESS_COOKIE.httponly,
+        secure=ACCESS_COOKIE.secure,
+        samesite=ACCESS_COOKIE.samesite,
+    )
+
+
+def set_auth_cookie(
     response: Response,
     access_jwt: str,
     refresh_jwt: str,

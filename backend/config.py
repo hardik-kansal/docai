@@ -7,7 +7,6 @@ class Settings(BaseSettings):
     # model_config must not be renamed, else looks for os env directly
     JWT_SECRET: str  # required
     JWT_ALGORITHM: str
-    TOKEN_EXPIRY_MINUTES: int = 60  # not required, have default value
     ISSUER: str
     REDIS_URL: str
     DB_URL: str
@@ -15,7 +14,7 @@ class Settings(BaseSettings):
 
 
 @lru_cache(maxsize=1)
-def settings():
+def settings() -> Settings:
     return Settings()
 
 

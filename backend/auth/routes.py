@@ -6,9 +6,10 @@ from . import tokens
 from fastapi import HTTPException, APIRouter, Response, Request, Depends
 from pydantic import BaseModel, Field
 from .services import AuthService
-from ..db.dependencies import get_auth_service
+from .dependencies import get_auth_service
 import logging
 from typing import Annotated
+from jwt import ExpiredSignatureError
 
 logger = logging.getLogger(__name__)
 
@@ -48,69 +49,23 @@ async def login(
         user = await authService.verify_credentials(
             credentials.username, credentials.pwd
         )
-        access_jwt, access_jti, refresh_jwt, refresh_jti = tokens.create_token_pair(
-            user_id=user.user_id,
-            scopes=user.scopes,
-        )
-        # Store refresh in Redis
-        await token_store.store_refresh(
-            jti=refresh_jti,
-            user_id=user.user_id,
-            scopes=[s.value for s in user.scopes],
-            ttl_seconds=REFRESH_COOKIE.max_age,
-        )
     except (
         ValueError
     ):  # catch only value error if something else wrong would never know
         raise HTTPException(status_code=401, detail="invalid credentials")
-    # Set cookies
-    set_auth_cookies(response, access_jwt, refresh_jwt)
-    return {"message": "authenticated", "user_id": user.user_id}
-
-
-@router.post("/refresh")
-async def refresh(
-    request: Request,
-    response: Response,
-    token_store: Annotated[TokenStore, Depends(get_token_store)],
-):
-    raw_refresh = request.cookies.get(REFRESH_COOKIE.key)
-    if raw_refresh is None:
-        raise HTTPException(status_code=401, detail="No refresh token")
-
-    # Decode (validates exp, iss, signature)
-    old_payload = tokens._decode_token(raw_refresh, expected_type="refresh")
-
-    # Server-side validation — is this jti still live in Redis?
-    stored = await token_store.validate_refresh(old_payload.jti)
-    if stored is None:
-        # Possible theft: token was already rotated by the real user.
-        # Nuclear response: kill ALL sessions for this user.
-        logger.critical(
-            "Refresh token replay detected! jti=%s user=%s",
-            old_payload.jti,
-            old_payload.sub,
-        )
-        await token_store.revoke_all_user_sessions(old_payload.sub)
-        clear_auth_cookies(response)
-        raise HTTPException(status_code=401, detail="Session invalidated")
-
-    # Rotate: kill old, mint new
-    await token_store.revoke_refresh(old_payload.jti)
-
     access_jwt, access_jti, refresh_jwt, refresh_jti = tokens.create_token_pair(
-        user_id=old_payload.sub,
-        scopes=old_payload.scopes,
+        user_id=user.user_id,
+        scopes=user.scopes,
     )
+
     await token_store.store_refresh(
         jti=refresh_jti,
-        user_id=old_payload.sub,
-        scopes=[s.value for s in old_payload.scopes],
+        user_id=user.user_id,
+        scopes=[s.value for s in user.scopes],
         ttl_seconds=REFRESH_COOKIE.max_age,
     )
     set_auth_cookies(response, access_jwt, refresh_jwt)
-
-    return {"message": "tokens rotated"}
+    return {"message": "authenticated", "user_id": user.user_id}
 
 
 @router.post("/logout")
@@ -119,10 +74,12 @@ async def logout(
     response: Response,
     token_store: Annotated[TokenStore, Depends(get_token_store)],
 ):
-    # Kill refresh
     refresh_jwt = request.cookies.get(REFRESH_COOKIE.key, None)
     if refresh_jwt is not None:
-        payload = tokens._decode_token(refresh_jwt, expected_type="refresh")
+        try:
+            payload = tokens._decode_token(refresh_jwt, expected_type="refresh")
+        except ExpiredSignatureError:
+            logger.warning("refresh token expired before logout")
         await token_store.revoke_refresh(payload.jti)
 
     clear_auth_cookies(response)

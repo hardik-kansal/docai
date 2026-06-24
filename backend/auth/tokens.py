@@ -1,11 +1,3 @@
-"""Authentication and authorization for the Clause API gateway.
-
-Implements:
-- JWT bearer-token verification (authn)
-- Scope-based document access control (authz)
-- FastAPI dependency injection for both
-"""
-
 from __future__ import annotations
 # python when loading, checks from top to bottom and panics if class if defined later but
 # its type hint used earlier, so earlier dev put "type" like in string format
@@ -20,13 +12,12 @@ import uuid
 from .cookies import ACCESS_COOKIE, REFRESH_COOKIE
 import jwt
 from fastapi import HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 
 logger = logging.getLogger(__name__)
 
 JWT_ALGORITHM = settings().JWT_ALGORITHM
 JWT_SECRET = settings().JWT_SECRET
-TOKEN_EXPIRY_MINUTES = settings().TOKEN_EXPIRY_MINUTES
 ISSUER = settings().ISSUER
 
 
@@ -102,9 +93,11 @@ def _decode_token(raw_token: str, expected_type: str) -> TokenPayload:
             exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
             jti=data["jti"],
             type=data["type"],
+            iss=data["iss"],
             # converts to datetime object though already it was
         )
-    except (KeyError, ValueError) as exc:
+    # validation error if pydantic mapping fails
+    except (KeyError, ValueError, ValidationError) as exc:
         # This means Google/Auth0 or your own auth service issued a token
         # that broke the promised structural schema contract.
         logger.error(
@@ -181,43 +174,4 @@ def create_token_pair(
     )
 
 
-'''
-
-# depends is a class used with annotated,
-#  which is used only with endpoint func called by fastapi
-# # which make whenver this function is called, first call this function inside
-# and inject the result value
-# it automatically forwards the active HTTP request, cookies, and headers into inside func
-# without you mapping them manually.
-# depends can be used with recursive func tree which is called by fastapi endpoint.
-
-def get_db():
-    return Database()
-
-def get_user(db=Depends(get_db)):
-    return User(db)
-
-@app.get("/")
-def route(user=Depends(get_user)):
-
-
-# if depends used, func not called by fastapi, then default value is depends() object 
-# not actually calling func and injecting result
-
-def me(settings: Settings = Depends(get_settings)):
-    print(settings)
-me() 
-prints Depends(dependency=<class '__main__.Settings'>, use_cache=True, scope=None)
-
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-_bearer_scheme = HTTPBearer()
-
-async def get_current_user(
-    credentials: Annotated[HTTPAuthorizationCredentials, Depends(_bearer_scheme)],
-    # HTTPAuthorizationCredentials have .credentials (jwt) .scheme (bearer)
-) -> TokenPayload:
-    """FastAPI dependency — extracts and validates the bearer token."""
-    return _decode_token(credentials.credentials)
-# annotted[x,y] -> arg: x=y but y is depends class, x is another type thats why used
-
-'''
+# unwraping needs outer brackets always

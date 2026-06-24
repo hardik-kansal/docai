@@ -10,14 +10,11 @@ from ..schemas import AccessScope
 logger = logging.getLogger(__name__)
 
 
+# class.newattribute fails bz of slots-> no dict created
+# class.attr=something fails since frozen
+# dataclass sets __init__, repr which is print, eq (equal)
 @dataclass(frozen=True, slots=True)
 class UserRow:
-    """Domain object — what the DB returns. Not a Pydantic model.
-
-    Pydantic is for API boundaries (serialization, validation).
-    Internal domain objects use dataclasses — lighter, no JSON overhead.
-    """
-
     user_id: str
     username: str
     password_hash: str
@@ -84,6 +81,7 @@ class UserRepository:
             "SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)",
             username,
         )
-        # fetchval returns the first column of the first row — a single scalar.
-        # EXISTS returns a boolean, so val is True/False directly.
+
         return val
+        # fetchval with exits returns true/false
+        # if user first column value exists which is user_id

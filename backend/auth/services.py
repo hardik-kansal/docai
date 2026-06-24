@@ -2,37 +2,38 @@ from __future__ import annotations
 
 
 import logging
-
 import bcrypt
-
 from .repository import UserRepository, UserRow
 from ..schemas import AccessScope
 
 logger = logging.getLogger(__name__)
 
-# bcrypt is intentionally CPU-heavy (that's the point — slows brute force).
+
+_DEFAULT_SCOPES = [AccessScope.LEGAL]  # new users get minimal access
+
+
+# bcrypt is intentionally CPU-heavy (— slows brute force).
 # In production with high signup volume, offload to a thread via
 # asyncio.to_thread(bcrypt.hashpw, ...) to avoid blocking the event loop.
 # For your scale, sync is fine.
-
-_DEFAULT_SCOPES = [AccessScope.LEGAL]  # new users get minimal access
 
 
 def _hash_password(plain: str) -> str:
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
 
+# encode converts to bytes, since lib expects it
+# decode coneverts bytes to str
+
+
 def _verify_password(plain: str, hashed: str) -> bool:
     return bcrypt.checkpw(plain.encode(), hashed.encode())
 
 
+# bcrypt.checkpw() extracts the salt from the stored hash
+
+
 class AuthService:
-    """Orchestrates user creation and credential verification.
-
-    Depends on UserRepository (DB) but knows nothing about HTTP or tokens.
-    Routes call this, then handle token minting + cookies themselves.
-    """
-
     def __init__(self, repo: UserRepository) -> None:
         self._repo = repo
 
