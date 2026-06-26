@@ -29,9 +29,8 @@ async def signup(
 ):
     try:
         user = await authService.register_user(credentials.username, credentials.pwd)
-    except ValueError as exc:
-        # 409 is req is valid but interfer with current status of server
-        raise HTTPException(status_code=409, detail=str(exc))
+    except ValueError:  # though here custom made error should be there
+        raise HTTPException(status_code=409, detail="invalid credentials")
     return {"message": "signup success", "user_id": user.user_id}
 
 
@@ -49,10 +48,9 @@ async def login(
         user = await authService.verify_credentials(
             credentials.username, credentials.pwd
         )
-    except (
-        ValueError
-    ):  # catch only value error if something else wrong would never know
+    except ValueError:  # though here custom made error should be there
         raise HTTPException(status_code=401, detail="invalid credentials")
+
     access_jwt, access_jti, refresh_jwt, refresh_jti = tokens.create_token_pair(
         user_id=user.user_id,
         scopes=user.scopes,
@@ -64,6 +62,7 @@ async def login(
         scopes=[s.value for s in user.scopes],
         ttl_seconds=REFRESH_COOKIE.max_age,
     )
+    # this must be set at last ,in case refresh fails, this wont be set in response.
     set_auth_cookies(response, access_jwt, refresh_jwt)
     return {"message": "authenticated", "user_id": user.user_id}
 
@@ -75,12 +74,14 @@ async def logout(
     token_store: Annotated[TokenStore, Depends(get_token_store)],
 ):
     refresh_jwt = request.cookies.get(REFRESH_COOKIE.key, None)
+    clear_auth_cookies(response)
+    # must be done in starting else if error occurs might not cleaned up
     if refresh_jwt is not None:
         try:
             payload = tokens._decode_token(refresh_jwt, expected_type="refresh")
+            await token_store.revoke_refresh(payload.jti)
         except ExpiredSignatureError:
             logger.warning("refresh token expired before logout")
-        await token_store.revoke_refresh(payload.jti)
-
-    clear_auth_cookies(response)
+        except Exception:
+            raise HTTPException(status_code=400, detail="invalid cookie received")
     return {"message": "logged out"}

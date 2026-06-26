@@ -3,6 +3,7 @@ from __future__ import annotations
 # its type hint used earlier, so earlier dev put "type" like in string format
 # python does not check this now, which saves time to boot up
 # instead of doing this, just put from __future__ import annotations in every req file
+# only for type hint, if class is init then wrong error
 
 from ..config import settings
 import logging
@@ -11,8 +12,7 @@ from ..schemas import AccessScope
 import uuid
 from .cookies import ACCESS_COOKIE, REFRESH_COOKIE
 import jwt
-from fastapi import HTTPException, status
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -33,83 +33,33 @@ class TokenPayload(BaseModel):
     type: str = Field(default=...)
 
 
-# ---------------------------------------------------------------------------
-# Token verification (FastAPI dependency)
-# ---------------------------------------------------------------------------
 def _decode_token(raw_token: str, expected_type: str) -> TokenPayload:
-    """Decode + validate JWT; raises HTTPException on any failure."""
+    data = jwt.decode(
+        raw_token,
+        JWT_SECRET,
+        algorithms=[JWT_ALGORITHM],  # very imp, if not provide attacks possible
+        issuer=ISSUER,
+    )
 
-    # --- PHASE 1: CRYPTOGRAPHIC DECODING ---
-    try:
-        data = jwt.decode(
-            raw_token,
-            JWT_SECRET,
-            algorithms=[JWT_ALGORITHM],  # very imp, if not provide attacks possible
-            issuer=ISSUER,
-        )
-    except jwt.ExpiredSignatureError:
-        logger.debug("Expired token presented")
-        raise  # re-raises original error and with traceback
-
-    except jwt.InvalidIssuedAtError:
-        logger.warning("Token issued date is in the future (skewed clock)")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token execution lifecycle invalid",
-        )
-    except jwt.InvalidIssuerError:
-        logger.warning("Cross-environment or invalid issuer detected")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token source origin",
-        )
-    except jwt.InvalidTokenError as exc:
-        logger.warning("Cryptographic verification failed: %s", exc)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-        )
-
-    # --- PHASE 2: STRUCTURAL VALIDATION (Outside the JWT Try Block) ---
-
-    # If keys are missing, KeyError triggers here.
-    # If AccessScope mapping fails, ValueError triggers here.
     if data["type"] != expected_type:
         logger.warning(
             "Token type mismatch: expected=%s got=%s", expected_type, data["type"]
         )
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type",
-        )
-    try:
-        return TokenPayload(
-            sub=data["sub"],
-            scopes=[AccessScope(s) for s in data.get("scopes", [])],
-            # .get(value to search, default)
-            # imp but not here some external auth providers when issue token
-            # leaves those fields in payloads which are empty so there if
-            # i write my another decoder without .get it would fail-> defensive engineering
-            exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
-            jti=data["jti"],
-            type=data["type"],
-            iss=data["iss"],
-            # converts to datetime object though already it was
-        )
-    # validation error if pydantic mapping fails
-    except (KeyError, ValueError, ValidationError) as exc:
-        # This means Google/Auth0 or your own auth service issued a token
-        # that broke the promised structural schema contract.
-        logger.error(
-            "Decoded JWT payload failed schema compliance mapping: %s",
-            exc,
-            exc_info=True,
-        )
-        # exc_info get full trace, error not warning since its server side problem
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Malformed internal token structure",
-        )
+        raise ValueError("token type mismatched")  # custom error must be raised though
+
+    return TokenPayload(
+        sub=data["sub"],
+        scopes=[AccessScope(s) for s in data.get("scopes", [])],
+        # .get(value to search, default)
+        # imp but not here some external auth providers when issue token
+        # leaves those fields in payloads which are empty so there if
+        # i write my another decoder without .get it would fail-> defensive engineering
+        exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
+        jti=data["jti"],
+        type=data["type"],
+        iss=data["iss"],
+        # converts to datetime object though already it was
+    )
 
 
 def _generate_jti() -> str:
@@ -129,7 +79,6 @@ def create_access_token(user_id: str, scopes: list[AccessScope]) -> tuple[str, s
         "type": "access",  # prevents using refresh as access
     }
     access_jwt = jwt.encode(access_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    logger.debug("access token issued for user=%s scopes=%s", user_id, scopes)
     return access_jwt, access_jti
 
 
@@ -153,7 +102,6 @@ def create_refresh_token(user_id: str, scopes: list[AccessScope]) -> tuple[str, 
     # sub,exp,iat,iss(issuer) changing these we lose native automation features
     # like exp check, hash check
     refresh_jwt = jwt.encode(refresh_payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
-    logger.debug("refresh token issued for user=%s scopes=%s", user_id, scopes)
     return refresh_jwt, refresh_jti
 
 
@@ -163,10 +111,6 @@ def create_token_pair(
 ) -> tuple[str, str, str, str]:
     """
     Returns (access_jwt, access_jti, refresh_jwt,refresh_jti).
-
-    Caller is responsible for:
-      1. Storing refresh_jti in Redis via TokenStore.store_refresh()
-      2. Setting both cookies on the Response
     """
     return (
         *create_access_token(user_id, scopes),

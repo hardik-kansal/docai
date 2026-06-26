@@ -2,35 +2,18 @@ from __future__ import annotations
 
 
 import logging
-import bcrypt
 from .repository import UserRepository, UserRow
 from ..schemas import AccessScope
+from argon2 import PasswordHasher
+from argon2.exceptions import VerifyMismatchError
 
 logger = logging.getLogger(__name__)
+ph = PasswordHasher()
 
-
-_DEFAULT_SCOPES = [AccessScope.LEGAL]  # new users get minimal access
-
-
-# bcrypt is intentionally CPU-heavy (— slows brute force).
-# In production with high signup volume, offload to a thread via
-# asyncio.to_thread(bcrypt.hashpw, ...) to avoid blocking the event loop.
-# For your scale, sync is fine.
-
-
-def _hash_password(plain: str) -> str:
-    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
-
-
-# encode converts to bytes, since lib expects it
-# decode coneverts bytes to str
-
-
-def _verify_password(plain: str, hashed: str) -> bool:
-    return bcrypt.checkpw(plain.encode(), hashed.encode())
-
-
-# bcrypt.checkpw() extracts the salt from the stored hash
+_DEFAULT_SCOPES = (AccessScope.LEGAL,)  # new users get minimal access
+# better to use tuple here, so that couldnt be modifed elsewhere by mistake
+# comma makes it a tupple else its just a enum object with value legal
+# iterator will move over individual characters
 
 
 class AuthService:
@@ -43,19 +26,22 @@ class AuthService:
             # always raise http exceptions in routes, user should not be concerned
             # with app domain errors
 
-        password_hash = _hash_password(password)
+        password_hash = ph.hash(password)
+        # argon2 handles the salt generation and encoding/decoding automatically
 
         return await self._repo.create(
             username=username,
             password_hash=password_hash,
-            scopes=_DEFAULT_SCOPES,
+            scopes=_DEFAULT_SCOPES,  # scopes is list, but type conversion possible
         )
 
     async def verify_credentials(self, username: str, password: str) -> UserRow:
         user = await self._repo.get_by_username(username)
-        if user is None or not _verify_password(password, user.password_hash):
-            raise ValueError("Invalid credentials")
-            # dont use "user not found" and "wrong password"
-            # to prevent username enumeration attacks.
-            # means attacker knows which username exists
+        if user is None:
+            raise ValueError(f"Username '{username}' is None")
+        try:
+            # verify() returns True if it matches, or raises an exception if it doesn't
+            ph.verify(user.password_hash, password)
+        except VerifyMismatchError:
+            raise ValueError("password does not match")
         return user

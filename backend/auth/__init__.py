@@ -45,4 +45,29 @@ async def get_current_user(
     return _decode_token(credentials.credentials)
 # annotted[x,y] -> arg: x=y but y is depends class, x is another type thats why used
 
+
+
+
+
+import bcrypt
+# bcrypt is intentionally CPU-heavy (— slows brute force).
+# In production with high signup volume, offload to a thread via
+# asyncio.to_thread(bcrypt.hashpw, ...) to avoid blocking the event loop.
+# For your scale, sync is fine.
+
+
+def _hash_password(plain: str) -> str:
+    return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+
+
+# encode converts to bytes, since lib expects it
+# decode coneverts bytes to str
+
+
+def _verify_password(plain: str, hashed: str) -> bool:
+    return bcrypt.checkpw(plain.encode(), hashed.encode())
+
+
+# bcrypt.checkpw() extracts the salt from the stored hash
+
 '''

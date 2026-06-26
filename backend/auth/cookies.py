@@ -50,7 +50,7 @@ def set_access_cookie(
     )
 
 
-def set_auth_cookie(
+def set_auth_cookies(
     response: Response,
     access_jwt: str,
     refresh_jwt: str,

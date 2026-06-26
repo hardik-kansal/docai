@@ -1,4 +1,4 @@
-from fastapi import Response, Request
+from fastapi import Response, Request, HTTPException
 import redis.asyncio as redis
 from .token_store import TokenStore
 from . import tokens
@@ -81,9 +81,13 @@ async def get_current_user(
         except ExpiredSignatureError:
             logger.warning("both access and refresh token expired")
             return None
+        except Exception:
+            raise HTTPException(status_code=400, detail="invalid cookie received")
         access_jwt_new, _ = tokens.create_access_token(
             refresh_payload.sub, refresh_payload.scopes
         )
         cookies.set_access_cookie(response, access_jwt_new)
         return tokens._decode_token(access_jwt_new, expected_type="access")
+    except Exception:
+        raise HTTPException(status_code=400, detail="invalid cookie received")
     return access_payload
