@@ -34,12 +34,18 @@ class TokenPayload(BaseModel):
 
 
 def _decode_token(raw_token: str, expected_type: str) -> TokenPayload:
-    data = jwt.decode(
-        raw_token,
-        JWT_SECRET,
-        algorithms=[JWT_ALGORITHM],  # very imp, if not provide attacks possible
-        issuer=ISSUER,
-    )
+    try:
+        data = jwt.decode(
+            raw_token,
+            JWT_SECRET,
+            algorithms=[JWT_ALGORITHM],  # very imp, if not provide attacks possible
+            issuer=ISSUER,
+        )
+    except jwt.ExpiredSignatureError:
+        raise
+    except Exception:
+        logger.error("Token decoding failed: %s", exc_info=True)
+        raise
 
     if data["type"] != expected_type:
         logger.warning(

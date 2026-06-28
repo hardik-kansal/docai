@@ -2,9 +2,6 @@ name: project1
 
 services:
 
-  # ─────────────────────────────────────────────────────────────
-  # PostgreSQL + pgvector
-  # ─────────────────────────────────────────────────────────────
   postgres:
     # 115mb
     image: postgres:16-alpine
@@ -29,11 +26,8 @@ services:
       retries: 5  # if not respond, retires
       start_period: 10s # this check starts after 10s
 
-  # ─────────────────────────────────────────────────────────────
-  # Redis
-  # ─────────────────────────────────────────────────────────────
   redis:
-    # 15mb
+    # 15mb, if url not given, consider it default
     image: redis:7.2-alpine
     container_name: redis
     restart: unless-stopped
@@ -56,37 +50,6 @@ services:
       retries: 5
       start_period: 5s
 
-  # ─────────────────────────────────────────────────────────────
-  # Datadog Agent
-  # ─────────────────────────────────────────────────────────────
-  
-  # datadog:
-  #   image: gcr.io/datadoghq/agent:7
-  #   container_name: clause_datadog
-  #   restart: unless-stopped
-  #   environment:
-  #     DD_API_KEY: ${DD_API_KEY}
-  #     DD_SITE: datadoghq.com
-  #     DD_ENV: ${DD_ENV:-development}
-  #     DD_APM_ENABLED: "true"
-  #     DD_APM_NON_LOCAL_TRAFFIC: "true"          # accept traces from app container
-  #     DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"    # accept metrics from app container
-  #     DD_PROCESS_AGENT_ENABLED: "true"
-  #     DD_CONTAINER_LABELS_AS_TAGS: "true"
-  #     DD_LOGS_ENABLED: "true"
-  #     DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #     - /proc/:/host/proc/:ro
-  #     - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
-  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
-  #   ports:
-  #     - "8126:8126"   # APM trace receiver
-  #     - "8125:8125/udp" # DogStatsD metrics
-
-  # ─────────────────────────────────────────────────────────────
-  # Alembic migration runner (runs once, then exits)
-  # ─────────────────────────────────────────────────────────────
   migrate:
   # if i placed this inside api service as a command,
   # in scaling, all replica containers of api will try to run it at same time. 
@@ -98,16 +61,13 @@ services:
       target: runner # build till this stage, including runner
     container_name: migrate
     restart: "no" # only run this once, then turn off
-    env_file:
+    env_file: # all those services which req settings() to init, must give all env
       - .env
     command: ["alembic", "upgrade", "head"]
     depends_on:
       postgres:
         condition: service_healthy
 
-  # ─────────────────────────────────────────────────────────────
-  # FastAPI application
-  # ─────────────────────────────────────────────────────────────
   api:
     build:
       context: .
@@ -135,7 +95,35 @@ services:
     # labels:
     #   com.datadoghq.ad.logs: '[{"source": "python", "service": "clause-api"}]'
 
+
+  
+  # datadog:
+  #   image: gcr.io/datadoghq/agent:7
+  #   container_name: clause_datadog
+  #   restart: unless-stopped
+  #   environment:
+  #     DD_API_KEY: ${DD_API_KEY}
+  #     DD_SITE: datadoghq.com
+  #     DD_ENV: ${DD_ENV:-development}
+  #     DD_APM_ENABLED: "true"
+  #     DD_APM_NON_LOCAL_TRAFFIC: "true"          # accept traces from app container
+  #     DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"    # accept metrics from app container
+  #     DD_PROCESS_AGENT_ENABLED: "true"
+  #     DD_CONTAINER_LABELS_AS_TAGS: "true"
+  #     DD_LOGS_ENABLED: "true"
+  #     DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - /proc/:/host/proc/:ro
+  #     - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  #   ports:
+  #     - "8126:8126"   # APM trace receiver
+  #     - "8125:8125/udp" # DogStatsD metrics
+
+
 volumes:
   postgres_data:
   redis_data:
+
 

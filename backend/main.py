@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+from backend.auth.tokens import TokenPayload
+from fastapi import FastAPI, Depends
+from typing import Annotated
 from .auth.routes import router
 from contextlib import asynccontextmanager
 from .config import settings
@@ -9,6 +11,7 @@ from .auth.dependencies import (
     get_redis_pool,
     set_asyncpg_pool,
     get_asyncpg_pool,
+    get_current_user,
 )
 import asyncpg
 import logging
@@ -98,3 +101,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
 app.add_middleware(RouteMiddleware)
+
+
+@app.get("/")
+async def home(user: Annotated[TokenPayload, Depends(get_current_user)]):
+    return user

@@ -50,6 +50,6 @@ alembic downgrade -1
 
 psql -h localhost -U hardik -d project1
 \d users -> list structure of table
-\d -> list all tables
+\dt -> list all tables
 
 """

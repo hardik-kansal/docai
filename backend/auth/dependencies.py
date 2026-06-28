@@ -69,7 +69,7 @@ async def get_current_user(
 ) -> tokens.TokenPayload | None:
     refresh_jwt = request.cookies.get(cookies.REFRESH_COOKIE.key, None)
     access_jwt = request.cookies.get(cookies.ACCESS_COOKIE.key, None)
-    if access_jwt is None or refresh_jwt is None:
+    if refresh_jwt is None:
         return None
 
     try:

@@ -21,14 +21,14 @@ class CookieConfig:
 
 ACCESS_COOKIE = CookieConfig(
     key="access_token",
-    max_age=60 * 15,  # 15 minutes
+    max_age=15 * 60,  # 15 minutes
     path="/",
     samesite="lax",
 )
 REFRESH_COOKIE = CookieConfig(
     key="refresh_token",
-    max_age=60 * 60 * 24 * 7,  # 7 days
-    path="/api/v1/auth",
+    max_age=60 * 60 * 24,  # 7 days
+    path="/",
     samesite="strict",
 )
 

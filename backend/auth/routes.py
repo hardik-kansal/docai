@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 class LoginRequest(BaseModel):
     username: str = Field(default=..., max_length=10, min_length=1)
-    pwd: str = Field(default=..., max_length=10, min_length=5)
+    pwd: str = Field(default=..., max_length=10, min_length=1)
 
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])

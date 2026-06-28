@@ -3,7 +3,9 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env")  # pydantic looks for .env
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # pydantic looks for .env
+    # if .env has extra vars then extra="ignore" ignores them
     # model_config must not be renamed, else looks for os env directly
     JWT_SECRET: str  # required
     JWT_ALGORITHM: str
