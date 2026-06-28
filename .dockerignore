@@ -1,0 +1,46 @@
+# ─────────────────────────────────────────────────────────────
+# Security & Secrets
+# ─────────────────────────────────────────────────────────────
+# Never bake runtime environment files or git history into the image
+.env
+.env.*
+.git
+.gitignore
+.dockerignore
+
+# ─────────────────────────────────────────────────────────────
+# Python & FastAPI Caches
+# ─────────────────────────────────────────────────────────────
+# Local machine caches will conflict with Docker's Linux environment
+**/__pycache__
+**/*.py[cod]
+**/*.pyo
+**/*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ─────────────────────────────────────────────────────────────
+# Local Virtual Environments
+# ─────────────────────────────────────────────────────────────
+# Docker builds its own environment inside; do not copy your local one
+.venv/
+venv/
+env/
+ENV/
+
+# ─────────────────────────────────────────────────────────────
+# Local Database & Docker Data
+# ─────────────────────────────────────────────────────────────
+postgres_data/
+redis_data/
+*.db
+*.sqlite
+
+# ─────────────────────────────────────────────────────────────
+# Documentation, IDEs, and OS Junk
+# ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+.DS_Store
+README.md

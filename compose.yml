@@ -1,0 +1,141 @@
+name: project1
+
+services:
+
+  # ─────────────────────────────────────────────────────────────
+  # PostgreSQL + pgvector
+  # ─────────────────────────────────────────────────────────────
+  postgres:
+    # 115mb
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # postgres_data is just volume name
+      # in real, pg stores data here /var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    # health check is not one time setup, runs in bg
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"] # use container cmd
+      # pg_isready is pg tool to check server status
+      interval: 10s # check every
+      timeout: 5s  # time to respond for server
+      retries: 5  # if not respond, retires
+      start_period: 10s # this check starts after 10s
+
+  # ─────────────────────────────────────────────────────────────
+  # Redis
+  # ─────────────────────────────────────────────────────────────
+  redis:
+    # 15mb
+    image: redis:7.2-alpine
+    container_name: redis
+    restart: unless-stopped
+    # command tells to run this only
+    # not default boot up which saves redis data to disk temporaly
+    # lost if volume not set
+    # > is just so that we can write commands in multiple lines
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  # ─────────────────────────────────────────────────────────────
+  # Datadog Agent
+  # ─────────────────────────────────────────────────────────────
+  
+  # datadog:
+  #   image: gcr.io/datadoghq/agent:7
+  #   container_name: clause_datadog
+  #   restart: unless-stopped
+  #   environment:
+  #     DD_API_KEY: ${DD_API_KEY}
+  #     DD_SITE: datadoghq.com
+  #     DD_ENV: ${DD_ENV:-development}
+  #     DD_APM_ENABLED: "true"
+  #     DD_APM_NON_LOCAL_TRAFFIC: "true"          # accept traces from app container
+  #     DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"    # accept metrics from app container
+  #     DD_PROCESS_AGENT_ENABLED: "true"
+  #     DD_CONTAINER_LABELS_AS_TAGS: "true"
+  #     DD_LOGS_ENABLED: "true"
+  #     DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - /proc/:/host/proc/:ro
+  #     - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
+  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
+  #   ports:
+  #     - "8126:8126"   # APM trace receiver
+  #     - "8125:8125/udp" # DogStatsD metrics
+
+  # ─────────────────────────────────────────────────────────────
+  # Alembic migration runner (runs once, then exits)
+  # ─────────────────────────────────────────────────────────────
+  migrate:
+  # if i placed this inside api service as a command,
+  # in scaling, all replica containers of api will try to run it at same time. 
+    build:
+      # either build or look for image to pull
+      # if build, then first check cache if already build in another service
+      # we must give build here, bz each service is though isolated.
+      context: . # looks inside this folder for files, and dockerfile
+      target: runner # build till this stage, including runner
+    container_name: migrate
+    restart: "no" # only run this once, then turn off
+    env_file:
+      - .env
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─────────────────────────────────────────────────────────────
+  # FastAPI application
+  # ─────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      target: runner
+    container_name: api
+    restart: unless-stopped
+    env_file:
+      - .env
+    # environment:
+    #   DD_AGENT_HOST: datadog
+    #   DD_TRACE_AGENT_PORT: "8126"
+    #   DD_SERVICE: clause-api
+    #   DD_ENV: ${DD_ENV:-development}
+    #   DD_VERSION: ${DD_VERSION:-0.1.0}
+    #   DD_LOGS_INJECTION: "true"
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    # labels:
+    #   com.datadoghq.ad.logs: '[{"source": "python", "service": "clause-api"}]'
+
+volumes:
+  postgres_data:
+  redis_data:
+

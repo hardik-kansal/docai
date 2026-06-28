@@ -53,7 +53,7 @@ class ContextFilter(logging.Filter):
         return True
 
 
-logger = logging.getLogger("routes")
+logger = logging.getLogger("backend")
 logger.addFilter(ContextFilter())
 stdout_handler = logging.StreamHandler(sys.stdout)
 stdout_handler.setFormatter(JsonFormatter())
@@ -227,8 +227,9 @@ Redis
 just run app with -> uv run ddtrace-run python main.py
 
 
-whatever written in routemiddleware is handled by these tools.
 
+whatever written in routemiddleware is handled by these tools.
+these rools add in root logger by default.
 
 
 
