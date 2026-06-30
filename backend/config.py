@@ -14,6 +14,18 @@ class Settings(BaseSettings):
     DB_URL: str
     is_prod: bool  # "false converts to 0"
 
+    # MinIO / S3
+    minio_endpoint: str
+    minio_access_key: str
+    minio_secret_key: str
+    minio_bucket: str
+    minio_region: str
+
+    # Ingestion limits
+    max_file_size_bytes: int
+    presigned_url_expiry_seconds: int
+    stream_chunk_size_bytes: int
+
 
 @lru_cache(maxsize=1)
 def settings() -> Settings:

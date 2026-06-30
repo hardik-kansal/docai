@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import logging
 from .repository import UserRepository, UserRow
-from ..schemas import AccessScope
+from ..models.schemas import AccessScope
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 

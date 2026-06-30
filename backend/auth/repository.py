@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 import asyncpg
 
-from ..schemas import AccessScope
+from ..models.schemas import AccessScope
 
 logger = logging.getLogger(__name__)
 

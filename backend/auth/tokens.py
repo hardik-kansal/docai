@@ -8,7 +8,7 @@ from __future__ import annotations
 from ..config import settings
 import logging
 from datetime import datetime, timedelta, timezone
-from ..schemas import AccessScope
+from ..models.schemas import AccessScope
 import uuid
 from .cookies import ACCESS_COOKIE, REFRESH_COOKIE
 import jwt
@@ -22,7 +22,7 @@ ISSUER = settings().ISSUER
 
 
 class TokenPayload(BaseModel):
-    sub: str = Field(default=..., description="User ID / email")  # ...means req field
+    sub: str = Field(default=..., description="user_id")  # ...means req field
     # field enforces extra condition
     scopes: list[AccessScope] = Field(
         description="Document scopes the user may retrieve",
@@ -48,7 +48,7 @@ def _decode_token(raw_token: str, expected_type: str) -> TokenPayload:
         raise
 
     if data["type"] != expected_type:
-        logger.warning(
+        logger.error(
             "Token type mismatch: expected=%s got=%s", expected_type, data["type"]
         )
         raise ValueError("token type mismatched")  # custom error must be raised though

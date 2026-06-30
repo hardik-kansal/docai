@@ -1,4 +1,3 @@
-from backend.auth.tokens import TokenPayload
 from fastapi import FastAPI, Depends
 from typing import Annotated
 from .auth.routes import router
@@ -12,22 +11,24 @@ from .auth.dependencies import (
     set_asyncpg_pool,
     get_asyncpg_pool,
     get_current_user,
+    User,
 )
+from .ingestion.dependencies import set_boto3_client, get_boto3_client
 import asyncpg
 import logging
 import time
+import boto3
+from botocore.config import Config
+import contextlib
 
-
-logging.basicConfig(level=logging.INFO if settings().is_prod else logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+async def redis_start():
     logger.info("connecting to redis")
     start_time = time.perf_counter()
     _redis_pool = redis.Redis.from_url(
-        settings().REDIS_URL,  # e.g. "redis://localhost:6379/0"
+        settings().REDIS_URL,
         decode_responses=True,
         # redis.set("name","hardik")
         # redis.get("name")-> returns b"hardik"
@@ -47,6 +48,8 @@ async def lifespan(app: FastAPI):
     )
     set_redis_pool(_redis_pool)
 
+
+async def pg_start():
     start_time = time.perf_counter()
     logger.info("connecting to db")
     try:
@@ -76,26 +79,62 @@ async def lifespan(app: FastAPI):
     )
     set_asyncpg_pool(_pool)
 
+
+def s3_start() -> boto3.client:
+    start_time = time.perf_counter()
+    logger.info("connecting to s3")
+    client: boto3.client = boto3.client(
+        "s3",
+        endpoint_url=settings().minio_endpoint,
+        aws_access_key_id=settings().minio_access_key,
+        aws_secret_access_key=settings().minio_secret_key,
+        region_name=settings().minio_region,
+        config=Config(
+            max_pool_connections=50,
+            retries={"max_attempts": 3, "mode": "adaptive"},
+            connect_timeout=5,
+            read_timeout=30,
+        ),
+    )
+    try:
+        client.list_buckets()  # boto3 is sync lib never use inside tradional routes
+    except Exception:
+        logger.critical("failed to connect to s3 on startup")
+        raise
+
+    logger.info(
+        "s3 connected",
+        extra={"elapsed_ms": round((time.perf_counter() - start_time) * 1000, 2)},
+    )
+    set_boto3_client(client)
+
+
+# runs all functions even if any crashed
+# ELSE req nested way, close redis, use finally close pg, use finally, so on
+async def shutdown_all_services():
+    logger.info("Initiating global service shutdown sequence...")
+    async with contextlib.AsyncExitStack() as stack:
+        #  will execute in REVERSE order (Last in, First out).
+        stack.push_async_callback(get_asyncpg_pool().close)
+        stack.push_async_callback(get_redis_pool().aclose)
+        stack.push_async_callback(get_boto3_client().close)
+        # if passed as .close() executes immediately
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await redis_start()
+    await pg_start()
+    s3_start()
+
     # before startup
     yield
     # after startup
-
-    logger.info("closing redis pool")
     try:
-        await get_redis_pool().aclose()
-        logger.info("redis disconnected")
+        await shutdown_all_services()
     except Exception:
-        logger.error("error while closing redis pool")
+        logger.critical("shutdown failed")
         raise
-    finally:  # very imp
-        # since without it, if redis close failed, then db connection wont be close
-        logger.info("shutting down: closing db pool")
-        try:
-            await get_asyncpg_pool().close()
-            logger.info("db disconnected")
-        except Exception:
-            logger.error("error while closing db pool")
-            raise
 
 
 app = FastAPI(lifespan=lifespan)
@@ -104,5 +143,5 @@ app.add_middleware(RouteMiddleware)
 
 
 @app.get("/")
-async def home(user: Annotated[TokenPayload, Depends(get_current_user)]):
+async def home(user: Annotated[User, Depends(get_current_user)]):
     return user

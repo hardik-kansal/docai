@@ -1,3 +1,5 @@
+from ..models.schemas import AccessScope
+from dataclasses import dataclass
 from fastapi import Response, Request, HTTPException
 import redis.asyncio as redis
 from .token_store import TokenStore
@@ -63,6 +65,12 @@ def get_auth_service() -> AuthService:
     return AuthService(get_user_repository())
 
 
+@dataclass(frozen=True, slots=True)
+class User:
+    user_id: int
+    scopes: list[AccessScope]
+
+
 async def get_current_user(
     request: Request,
     response: Response,
@@ -70,7 +78,7 @@ async def get_current_user(
     refresh_jwt = request.cookies.get(cookies.REFRESH_COOKIE.key, None)
     access_jwt = request.cookies.get(cookies.ACCESS_COOKIE.key, None)
     if refresh_jwt is None:
-        return None
+        raise HTTPException(status_code=400, detail="user not logged in")
 
     try:
         access_payload = tokens._decode_token(access_jwt, expected_type="access")
@@ -80,14 +88,15 @@ async def get_current_user(
             refresh_payload = tokens._decode_token(refresh_jwt, expected_type="refresh")
         except ExpiredSignatureError:
             logger.warning("both access and refresh token expired")
-            return None
+            raise HTTPException(status_code=400, detail="user not logged in")
         except Exception:
-            raise HTTPException(status_code=400, detail="invalid cookie received")
+            raise HTTPException(status_code=400, detail="user not logged in")
         access_jwt_new, _ = tokens.create_access_token(
             refresh_payload.sub, refresh_payload.scopes
         )
         cookies.set_access_cookie(response, access_jwt_new)
-        return tokens._decode_token(access_jwt_new, expected_type="access")
+        access_payload = tokens._decode_token(access_jwt_new, expected_type="access")
+        return User(access_payload.sub, access_payload.scopes)
     except Exception:
         raise HTTPException(status_code=400, detail="invalid cookie received")
-    return access_payload
+    return User(access_payload.sub, access_payload.scopes)
