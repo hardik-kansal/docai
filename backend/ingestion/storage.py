@@ -8,9 +8,6 @@ from .dependencies import get_boto3_client
 import magic
 from ..config import settings
 from ..models.document import PresignedURLResponse
-import hmac
-import hashlib
-import secrets
 
 logger = logging.getLogger(__name__)
 settings = settings()
@@ -34,24 +31,6 @@ def validate_mime_type(raw_bytes: bytes, object_key):
             f"detected MIME={detected!r}, allowed={_ALLOWED_MIME_TYPES}"
         )
     logger.info("MIME validated: %s key=%s", detected, object_key)
-
-
-def _verify_minio_hmac(body_bytes: bytes, received_sig: str | None) -> None:
-    if received_sig is None:
-        raise ValueError("x_minio_sig is none")
-
-    expected_sig = hmac.new(
-        key=MINIO_WEBHOOK_SECRET.encode(),
-        msg=body_bytes,
-        digestmod=hashlib.sha256,
-    ).hexdigest()
-
-    # secrets.compare_digest prevents timing attacks
-    if not secrets.compare_digest(expected_sig, received_sig):
-        raise ValueError("signature not matched")
-    # "zebra" Fails on 1st letter. Python stops instantly. (Takes 1.0ms)
-    # "april" Matches 'a', 'p'. Fails on 'r'.              (Takes 1.2ms)
-    # by this attacker can know pwd
 
 
 def generate_presigned_put_url(

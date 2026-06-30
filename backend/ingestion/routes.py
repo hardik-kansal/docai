@@ -1,21 +1,13 @@
-"""
-Two endpoints:
-  GET  /get-upload-url   → returns presigned PUT URL to browser
-  POST /webhook/minio    → receives MinIO bucket notification, enqueues Celery task
-"""
-
-from fastapi import Body
 import logging
-from typing import Annotated
 import json
-from fastapi import APIRouter, Depends, HTTPException, Request, Header, status
-
+from fastapi import APIRouter, Depends, HTTPException, Request
+from urllib.parse import unquote
 from ..config import settings
 from ..models.document import (
     PresignedURLRequest,
     PresignedURLResponse,
 )
-from .storage import generate_presigned_put_url, _verify_minio_hmac
+from .storage import generate_presigned_put_url
 from .tasks import process_document_task
 from ..auth.dependencies import get_current_user, User
 
@@ -38,7 +30,6 @@ async def get_upload_url(
         content_type=content_type,
         file_size_bytes=file_size_bytes,
     )
-
     object_key = f"uploads/{user.user_id}/{filename}"
     # in s3 everything is stored as just key value pair, not folders but
     # s3 console ui shows folders hiearchy which is caused by "/"
@@ -54,26 +45,12 @@ async def get_upload_url(
 
 # this is addded as env while launching minio using docker
 #  webhook fired by minio one user uploads to bucket
-@router.post("/webhook/minio", status_code=status.HTTP_202_ACCEPTED)
+@router.post("/webhook/minio")
 async def minio_webhook(
     request: Request,
-    x_minio_event: Annotated[str | None, Header()] = None,
-    # in fastapi, Header() will look for request.headers
-    # and try to find "x-minio-event" var name, hypen replaced
-    # and assign its value to same alias
-    # acc to standard, http headers are case insensitve.
-    x_minio_signature: Annotated[str | None, Header()] = None,
-    body_bytes: Annotated[bytes | None, Body()] = None,
-    # in fastapi, body returns as a whole
-    # also packets are received in stream, so Body() waits till
-    # every packet is received and ordered.
 ) -> dict:
-    try:
-        _verify_minio_hmac(body_bytes, x_minio_signature)
-    except ValueError:
-        raise HTTPException(status_code=401)
-
-    payload = await json.loads(body_bytes)
+    body_bytes: bytes = await request.body()
+    payload = json.loads(body_bytes)
 
     # MinIO sends Records array — process each (usually 1 per webhook)
     records = payload.get("Records", [])
@@ -86,7 +63,9 @@ async def minio_webhook(
 
         s3_info = record.get("s3", {})
         bucket = s3_info.get("bucket", {}).get("name", None)
-        obj_key = s3_info.get("object", {}).get("key", None)
+        obj_key = unquote(s3_info.get("object", {}).get("key", None))
+        # uploads%2Fuser_id%2Ffilename -> unquote url decode the string
+
         obj_size = s3_info.get("object", {}).get("size", 0)
         if obj_size > settings.max_file_size_bytes:
             raise ValueError(
@@ -98,6 +77,7 @@ async def minio_webhook(
 
         # this process_document_task is a func in code, but it is wrapped inside decorator
         # and celery task class is returned
+        logger.info(obj_key.split("/")[1])
         task = process_document_task.delay(
             bucket=bucket,
             object_key=obj_key,
@@ -122,7 +102,7 @@ async def minio_webhook(
 
 
 """
-
+body 
 {
   "Records": [
     {
@@ -169,5 +149,12 @@ async def minio_webhook(
   ]
 }
 
+header
+{
+ 'host': 'host.docker.internal:8000',
+ 'user-agent': 'Go-http-client/1.1', 
+ 'content-length': '1109', 
+ 'content-type': 'application/json'
+ }
 
 """

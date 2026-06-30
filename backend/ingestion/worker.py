@@ -1,6 +1,9 @@
 from celery import Celery
 from ..config import settings
-
+from celery.signals import worker_process_init
+import boto3
+from botocore.config import Config
+from .dependencies import set_boto3_client
 
 celery_app = Celery(
     "project1_celery",  # just application name
@@ -46,3 +49,16 @@ celery_app.conf.update(
 # thats why our task code neeeds to be idompotent,
 # means running it multiple times would give same final state, as if run only once.
 # say if task updates a balance, then balance might be updated twice.
+
+
+@worker_process_init.connect
+def init_worker_s3(**kwargs):
+    client = boto3.client(
+        "s3",
+        endpoint_url=settings().minio_endpoint,
+        aws_access_key_id=settings().minio_access_key,
+        aws_secret_access_key=settings().minio_secret_key,
+        region_name=settings().minio_region,
+        config=Config(retries={"max_attempts": 3, "mode": "adaptive"}),
+    )
+    set_boto3_client(client)

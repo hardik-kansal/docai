@@ -82,7 +82,7 @@ async def get_current_user(
 
     try:
         access_payload = tokens._decode_token(access_jwt, expected_type="access")
-    except ExpiredSignatureError:
+    except Exception:
         logger.warning("access token expired attempting refresh")
         try:
             refresh_payload = tokens._decode_token(refresh_jwt, expected_type="refresh")
@@ -97,6 +97,5 @@ async def get_current_user(
         cookies.set_access_cookie(response, access_jwt_new)
         access_payload = tokens._decode_token(access_jwt_new, expected_type="access")
         return User(access_payload.sub, access_payload.scopes)
-    except Exception:
-        raise HTTPException(status_code=400, detail="invalid cookie received")
+
     return User(access_payload.sub, access_payload.scopes)

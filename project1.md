@@ -68,11 +68,11 @@ Guardrail layer — injection scanning on input, PII redaction before LLM + befo
 Cost/latency layer — semantic cache, query router (route trivial queries to a cheap model), per-query token + cost accounting surfaced in the UI.
 Technologies.
 
-Python/async, FastAPI, pgvector + Qdrant, Redis, an embedding model + cross-encoder reranker, Anthropic/OpenAI SDK, Ragas, LangSmith, Docker, GitHub Actions, a PaaS for the live demo.
+Python/async, FastAPI, postgresql, Qdrant, Redis, an embedding model + cross-encoder reranker, Anthropic/OpenAI SDK, Ragas, LangSmith, Docker, GitHub Actions, a PaaS for the live demo.
 
 (LangGraph not required here — keep Project 1 framework-light to prove you understand the primitives; that's a deliberate talking point.)
 
-### Advanced features beyond tutorial level.
+### features to have
 
 Clause-level citation enforcement with self-verification; abstention/escalation on low confidence; hybrid + rerank (most demos do pure-vector); access-control-aware retrieval; semantic caching; model routing for cost; a real eval suite gating CI.
 
@@ -156,17 +156,5 @@ Dockerized service + Postgres/pgvector + Redis via Docker Compose locally; GitHu
           ▼
    [ CELERY WORKER RAM BUFFER ]
           │
-          │  ⚡ Uses standard python utility: `io.BytesIO`
-          │ 12. Keeps file stream open inside computer memory (RAM)
-          │ 13. Calculates target page byte offsets (e.g., Page 5 starts at byte 250,000)
-          │ 14. Streams only page 5 slice over the network into RAM buffer
-          ▼
- ➎ PARSING & TEXT CHUNKING ENGINE
- ────────────────────────────────
-   [ TEXT EXTRACTION LAYER ]
-          │
-          │  ⚡ Uses parser library: `unstructured`
-          │ 15. Extracts raw, unformatted clean text string from the RAM byte buffer
-          ▼
-currently till this point only
-
+          │ 
+          

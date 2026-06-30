@@ -17,6 +17,6 @@ def set_boto3_client(_client: boto3.client):
     _s3_client = _client
 
 
-def get_boto3_client(_client: boto3.client) -> boto3.client:
+def get_boto3_client() -> boto3.client:
     assert _s3_client is not None, "_s3_client not initialized"
     return _s3_client

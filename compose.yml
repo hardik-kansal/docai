@@ -82,6 +82,8 @@ services:
 
     volumes:
       - minio_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     command: server /data --console-address ":9001"
     # this is imp to tell its role as server else crash
 

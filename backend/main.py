@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Depends
 from typing import Annotated
-from .auth.routes import router
+from .auth.routes import router as auth_router
+from .ingestion.routes import router as s3_router
 from contextlib import asynccontextmanager
 from .config import settings
 from .logging_config import RouteMiddleware
@@ -138,7 +139,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
-app.include_router(router)
+app.include_router(auth_router)
+app.include_router(s3_router)
 app.add_middleware(RouteMiddleware)
 
 

@@ -1,9 +1,9 @@
-from fastapi import HTTPException
 import logging
 from celery import Task
 from .worker import celery_app
 from .storage import validate_mime_type
 from .dependencies import get_boto3_client, s3_download_config
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +46,7 @@ class _BaseIngestionTask(Task):
     max_retries=3,
     default_retry_delay=30,
 )
+# http exceptions have no sense here these are return response for server
 def process_document_task(
     self: Task,
     bucket: str,
@@ -53,14 +54,16 @@ def process_document_task(
     user_id: str,
     access_scope: str,
 ):
+    # it downloads in chunks efficiently, to avoid consuming ram
+    local_path = f"{self.request.id}.pdf"
     get_boto3_client().download_file(
-        bucket, object_key, "temp-parser.pdf", s3_download_config
+        bucket, object_key, local_path, Config=s3_download_config
     )
 
-    # it downloads in chunks efficiently, to avoid consuming ram
-    with open("temp-parser", "rb") as f:
-        try:
+    try:
+        # if error first closes file, using __exit__, then re raise,
+        # though finally would still run, and then task retries.
+        with open(local_path, "rb") as f:
             validate_mime_type(f.read(512), object_key)
-        except ValueError:
-            raise HTTPException(status_code=401, detail="only pdf files req")
-        # if here dont raise then, file wont be close
+    finally:
+        os.unlink(local_path)
