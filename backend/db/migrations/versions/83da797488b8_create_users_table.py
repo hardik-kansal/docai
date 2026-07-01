@@ -28,7 +28,7 @@ def upgrade() -> None:
             user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- PRIMARY KEY = Automatically indexed
             username  TEXT NOT NULL UNIQUE,  -- UNIQUE = Automatically indexed
             password_hash TEXT NOT NULL,
-            scopes    TEXT[] NOT NULL DEFAULT '{}', 
+            scopes    TEXT[] NOT NULL DEFAULT '{}',
             created_at TIMESTAMPTZ NOT NULL DEFAULT now()
         );
 

@@ -1,3 +1,4 @@
+import json
 import logging
 
 # from typing import Generator
@@ -22,8 +23,8 @@ _ALLOWED_MIME_TYPES: Final[frozenset[str]] = frozenset(
 
 
 def validate_mime_type(raw_bytes: bytes, object_key):
-    # header is stored mostly in first 512 bytes
-    # mime=true returns image/jpg instead of image file or jpg file
+    # for pdf we need roughly 5 bytes though
+    # mime=true returns image/jpg instead of "image file or jpg file"
     detected: str = magic.from_buffer(raw_bytes[:512], mime=True)
     if detected not in _ALLOWED_MIME_TYPES:
         raise ValueError(
@@ -33,30 +34,57 @@ def validate_mime_type(raw_bytes: bytes, object_key):
     logger.info("MIME validated: %s key=%s", detected, object_key)
 
 
-def generate_presigned_put_url(
-    object_key: str,
-    content_type: str,
-    file_size_bytes: int,
-) -> PresignedURLResponse:
-    if file_size_bytes > settings.max_file_size_bytes:
-        raise ValueError(
-            f"File size {file_size_bytes} exceeds limit {settings.max_file_size_bytes}"
-        )
-    url = get_boto3_client().generate_presigned_url(
-        ClientMethod="put_object",  # means uploading a file
-        Params={
-            "Bucket": settings.minio_bucket,
-            "Key": object_key,
-            "ContentType": content_type,
+def generate_presigned_put_url(object_key: str, max_bytes: int) -> PresignedURLResponse:
+    presigned_url = get_boto3_client().generate_presigned_post(
+        Bucket=settings.minio_bucket,
+        Key=object_key,
+        Conditions=[
+            # key must match else attacker could upload at any location
+            # possibly overwrite anyones document.
+            {"key": object_key},
+            # File size: 1 byte to max_bytes
+            ["content-length-range", 1, max_bytes],
+            # Must upload as PDF, though s3 only checks through header
+            ["eq", "$Content-Type", "application/pdf"],
+            # Store as private, (default)
+            # means s3 wont allow anyone access it publicly even user who submitted it
+            # only admin
+            {"acl": "private"},
+        ],
+        # adds these fields in presigned_url json, so user must send all these
+        # else upload req would fail
+        Fields={
+            "key": object_key,
+            "Content-Type": "application/pdf",
+            "acl": "private",
         },
         ExpiresIn=settings.presigned_url_expiry_seconds,
     )
-    # generates signature by hashing using sha256
+    logger.debug(presigned_url)
+
     return PresignedURLResponse(
-        upload_url=url,
+        upload_url=json.dumps(presigned_url),
         object_key=object_key,
         expires_in=settings.presigned_url_expiry_seconds,
     )
+
+
+"""
+presigned_url json
+{
+'url': 'http://localhost:9000/contracts', 
+'fields': { 
+            'key': 'uploads/ab0b00856e464dd1965bea5ffd3aaaf5/9ebcd527-f4c5-4325-8296-67b9b065c242/hardik', 
+            'Content-Type': 'application/pdf',
+            'acl': 'private',
+            'x-amz-server-side-encryption': 'AES256', 
+            'AWSAccessKeyId': 'hardik',
+            'policy': '...long str, 
+            'signature': 'hrf2vLs9Juro4mVVjCapDuW3H2k='
+            }
+}
+
+"""
 
 
 """

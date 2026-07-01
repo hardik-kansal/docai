@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import uuid
 
 import logging
 from .repository import UserRepository, UserRow
@@ -44,4 +44,18 @@ class AuthService:
             ph.verify(user.password_hash, password)
         except VerifyMismatchError:
             raise ValueError("password does not match")
+        return user
+
+    async def update_storage(self, user_id: str, filesize: int) -> UserRow | None:
+        uid = uuid.UUID(user_id)
+        user = await self._repo.update_storage(uid, filesize)
+        if user is None:
+            raise ValueError("user_id might not exist, unexplained error")
+        return user
+
+    async def get_by_user_id(self, user_id: str) -> UserRow | None:
+        uid = uuid.UUID(user_id)
+        user = await self._repo.get_by_user_id(uid)
+        if user is None:
+            raise ValueError("user_id does not exist")
         return user

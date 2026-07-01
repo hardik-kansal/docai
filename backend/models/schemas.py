@@ -1,4 +1,5 @@
 from enum import StrEnum
+from dataclasses import dataclass
 
 
 # ---------------------------------------------------------------------------
@@ -20,3 +21,21 @@ class AccessScope(StrEnum):  # now all eunum values must be string
 # s is enum class object, but now due to strEnum can be used to compare with str directly
 # which in fact still possible, but static linters like ruff might not allow
 # if try to create accesscope of something not part, automaticaly error
+
+
+class PlanType(StrEnum):
+    FREE = "FREE"
+
+
+@dataclass(frozen=True, slots=True)
+class PlanLimits:
+    # max_queries_per_day: int
+    max_storage_bytes: int
+
+
+PLANS = {
+    PlanType.FREE: PlanLimits(
+        # max_queries_per_day=100,
+        max_storage_bytes=2 * 1024 * 1024 * 1024,  # 2gb
+    ),
+}

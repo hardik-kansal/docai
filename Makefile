@@ -1,8 +1,11 @@
 docker-start:
 	docker compose down
 	@kill -9 $$(lsof -t -i@127.0.0.1:8000) 2>/dev/null || true
-	docker compose up -d postgres redis migrate minio
-	
+	docker compose up --build -d postgres redis migrate minio 
+	docker exec local_minio mc alias set local http://localhost:9000 hardik password
+	docker exec local_minio mc event add local/contracts arn:minio:sqs::FASTAPI:webhook --event put -p
+# mc is minio command tool, sqs is aws simple queue service	
+
 # docker when do compose up, gets recent cached image
 # if something in dockerfile changed, or in code
 # needs to use --build to create a fresh new image  
@@ -28,9 +31,8 @@ start:
 	@kill -9 $$(lsof -t -i:8000) 2>/dev/null || true
 	uv run fastapi dev backend/main.py
 
-minio-start:
-	docker exec local_minio mc alias set local http://localhost:9000 hardik password
-	docker exec local_minio mc event add local/contracts arn:minio:sqs::FASTAPI:webhook --event put -p
+
+
 
 
 	

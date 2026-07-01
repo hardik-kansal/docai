@@ -64,6 +64,8 @@ def process_document_task(
         # if error first closes file, using __exit__, then re raise,
         # though finally would still run, and then task retries.
         with open(local_path, "rb") as f:
-            validate_mime_type(f.read(512), object_key)
+            validate_mime_type(f.read(2048), object_key)  # 2kb
+
     finally:
+        get_boto3_client().delete_object(Bucket=bucket, Key=object_key)
         os.unlink(local_path)

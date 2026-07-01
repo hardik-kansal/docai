@@ -84,6 +84,7 @@ services:
       - minio_data:/data
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      # if docker container wants to send to local pc url
     command: server /data --console-address ":9001"
     # this is imp to tell its role as server else crash
 
