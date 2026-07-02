@@ -1,3 +1,4 @@
+from docling.document_converter import DocumentConverter
 import boto3
 from boto3.s3.transfer import TransferConfig
 
@@ -20,3 +21,16 @@ def set_boto3_client(_client: boto3.client):
 def get_boto3_client() -> boto3.client:
     assert _s3_client is not None, "_s3_client not initialized"
     return _s3_client
+
+
+_converter: DocumentConverter | None = None
+
+
+def get_converter() -> DocumentConverter:
+    assert _converter is not None, "_converter not init"
+    return _converter
+
+
+def set_converter(converter: DocumentConverter):
+    global _converter
+    _converter = converter

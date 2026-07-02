@@ -22,8 +22,8 @@ docker-start:
 celery-start:
 	uv run celery -A backend.ingestion.worker.celery_app worker -E -Q ingestion -l info --concurrency=4
 
-# -A is for application, worker is just role, uses 4 cores max if can
-# means 4 differnt files can be processed at a time.
+# -A is for application, worker is just role
+#  creates 4 differnt seperate proccess, like 4 new applications
 # -E enables task to monitor in terminal
 # -Q without it worker only listens and adds to redis, not process tasks
 

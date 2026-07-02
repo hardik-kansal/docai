@@ -4,6 +4,16 @@ from celery.signals import worker_process_init
 import boto3
 from botocore.config import Config
 from .dependencies import set_boto3_client
+from docling.document_converter import DocumentConverter, PdfFormatOption
+from docling.datamodel.base_models import InputFormat
+from docling.datamodel.pipeline_options import (
+    PdfPipelineOptions,
+    TableStructureOptions,
+    AcceleratorOptions,
+    AcceleratorDevice,
+)
+from .dependencies import set_converter
+
 
 celery_app = Celery(
     "project1_celery",  # just application name
@@ -41,7 +51,7 @@ celery_app.conf.update(
 )
 
 
-#  Idempotent delivery: at-least-once with ack-on-success
+# Idempotent delivery: means every task runs at-least-once with ack-on-success
 # celery gurantees with these config that a task will not be silently lost
 # and it will retry it
 # but what if task completely sucessfully then some problem occurs
@@ -51,6 +61,20 @@ celery_app.conf.update(
 # say if task updates a balance, then balance might be updated twice.
 
 
+"""
+
+first Celery Master process starts up, it runs code that tell os
+-> Hey kernel, take an exact snapshot of me right now, 
+clone it, and paste it into a brand new, independent memory space.
+-> master process uses os fork()
+-> The OS gives them their own unique PIDs and isolated memory blocks.
+-> after that detaches this pid from master, 
+-> and runs each child as a complete unrealted seperate process not threads
+
+"""
+
+
+# runs only once, before child process accepts its first task
 @worker_process_init.connect
 def init_worker_s3(**kwargs):
     client = boto3.client(
@@ -62,3 +86,89 @@ def init_worker_s3(**kwargs):
         config=Config(retries={"max_attempts": 3, "mode": "adaptive"}),
     )
     set_boto3_client(client)
+
+
+def create_converter() -> DocumentConverter:
+    pipeline_options = PdfPipelineOptions()
+    pipeline_options.do_ocr = False
+    pipeline_options.do_table_structure = True
+    pipeline_options.table_structure_options = TableStructureOptions(
+        do_cell_matching=True
+    )
+    pipeline_options.accelerator_options = AcceleratorOptions(
+        num_threads=8, device=AcceleratorDevice.AUTO
+    )
+    converter = DocumentConverter(
+        format_options={
+            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+        }
+    )
+    set_converter(converter)
+
+
+@worker_process_init.connect
+def preload_models(**kwargs):
+    create_converter()
+
+
+"""
+
+do_ocr = False → OCR never runs;Correct setting for a pure-text PDF, and the fastest.
+
+do_ocr = True with the default force_full_page_ocr = False 
+-> Docling runs in what the docs call "hybrid detection":
+-> it prefers the existing text layer and only OCRs regions that don't have one 
+-> (e.g. a scanned image embedded on an otherwise digital page). 
+-> On a pure-text PDF there's nothing for OCR to fill in, so the output shouldn't change 
+—> but the OCR engine still gets loaded and run as a pass over every page
+
+do_ocr = True + force_full_page_ocr = True 
+-> This forces OCR over every page regardless of whether a text layer exists
+-> and it will replace your clean digital text with re-OCR'd text. 
+-> Never use this on text only PDFs -> confirmed bugs
+
+"""
+
+
+"""
+
+why celery?
+oldest, most widely known, dominates job postings but it's sync-first, can do async work too.
+
+arq: asyncio-native, very less maintainace
+
+Taskiq: "Celery for async," actively maintained, multiple broker support (Redis/RabbitMQ/NATS/Kafka).Downside: smaller community, not a recognized keyword in job postings, less battle-tested at scale than Celery.
+
+SAQ: async, actively maintained, ships a built-in web UI for watching jobs Downside: smallest community of the four, only redis support
+
+
+Taskiq
+Suppose one worker process is there (each worker/one cpu).It has one asyncio event loop.
+
+Task A await 5s
+Task B await 5s
+when task a waits, task b spins on core.
+
+
+Celery
+one worker process executes one task.
+Even though taska is taking 5 seconds, that process is still considered busy with Task A. It will not start Task B in that same process.
+Concurrency comes from more processes, not from multiplexing many coroutines inside one process.
+
+but if task is more 
+pdf = parse_pdf_locally()      # CPU-heavy
+embeddings = local_model(pdf)  # CPU/GPU-heavy
+taskiq gains nothing
+
+in this case, taskiq can work faster.
+
+Download PDF      200 ms 
+Parse PDF         800 ms (CPU) if gpu then taskiq more faster
+Chunk             100 ms (CPU)
+OpenAI            4 s  
+Qdrant            100 ms 
+Postgres          50 ms
+
+But celery is more trusted for every other case with complex workflows handling.
+
+"""

@@ -1,9 +1,11 @@
+from docling.datamodel.base_models import ConversionStatus
 import logging
 from celery import Task
 from .worker import celery_app
 from .storage import validate_mime_type
-from .dependencies import get_boto3_client, s3_download_config
+from .dependencies import get_boto3_client, s3_download_config, get_converter
 import os
+
 
 logger = logging.getLogger(__name__)
 
@@ -61,10 +63,17 @@ def process_document_task(
     )
 
     try:
-        # if error first closes file, using __exit__, then re raise,
-        # though finally would still run, and then task retries.
         with open(local_path, "rb") as f:
-            validate_mime_type(f.read(2048), object_key)  # 2kb
+            validate_mime_type(f.read(2048), object_key)
+
+        result = get_converter().convert(local_path)
+        if result.status == ConversionStatus.FAILURE:
+            raise ValueError(f"Docling conversion failed: {result.errors}")
+        elif result.status == ConversionStatus.PARTIAL_SUCCESS:
+            for err in result.errors:
+                logger.warning(err.error_message)
+
+        # doc = result.document
 
     finally:
         get_boto3_client().delete_object(Bucket=bucket, Key=object_key)
