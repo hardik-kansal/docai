@@ -3,8 +3,14 @@ import logging
 from celery import Task
 from .worker import celery_app
 from .storage import validate_mime_type
-from .dependencies import get_boto3_client, s3_download_config, get_converter
+from .dependencies import (
+    get_boto3_client,
+    s3_download_config,
+    get_converter,
+    get_chunker,
+)
 import os
+import json
 
 
 logger = logging.getLogger(__name__)
@@ -73,7 +79,37 @@ def process_document_task(
             for err in result.errors:
                 logger.warning(err.error_message)
 
-        # doc = result.document
+        doc = result.document  # everything in ram
+        with open("attention_chunks2", "w") as f:
+            f.write(json.dumps(doc, default=str))
+        chunker = get_chunker()  # fast enough, init before this worker started
+
+        chunks = chunker.chunk(doc)  # this is a generator, use next()
+        # all chunks have not computed yet
+
+        """
+        chunks -
+                text
+                meta -  
+                    docMeta -
+                            docItems per para
+                    captions
+                    headings
+                    origin 
+        """
+
+        records = [
+            {
+                "text_for_display": chunk.text,
+                "text_for_embedding": chunker.contextualize(chunk),
+                "headings": chunk.meta.headings,
+                "doc_items": chunk.meta.doc_items,
+            }
+            for chunk in chunks
+        ]
+
+        with open("attention_chunks1", "w") as f:
+            f.write(json.dumps(records, default=str))
 
     finally:
         get_boto3_client().delete_object(Bucket=bucket, Key=object_key)

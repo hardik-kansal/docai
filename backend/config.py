@@ -26,6 +26,9 @@ class Settings(BaseSettings):
     presigned_url_expiry_seconds: int
     stream_chunk_size_bytes: int
 
+    EMBED_MODEL_ID: str
+    MAX_TOKENS: int
+
 
 @lru_cache(maxsize=1)
 def settings() -> Settings:

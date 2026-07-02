@@ -3,7 +3,7 @@ from ..config import settings
 from celery.signals import worker_process_init
 import boto3
 from botocore.config import Config
-from .dependencies import set_boto3_client
+from .dependencies import set_boto3_client, set_converter, set_chunker
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (
@@ -12,7 +12,17 @@ from docling.datamodel.pipeline_options import (
     AcceleratorOptions,
     AcceleratorDevice,
 )
-from .dependencies import set_converter
+from docling.chunking import HybridChunker
+from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
+from docling_core.transforms.chunker.hierarchical_chunker import (
+    ChunkingDocSerializer,
+    ChunkingSerializerProvider,
+)
+from docling_core.transforms.serializer.markdown import (
+    MarkdownParams,
+    MarkdownTableSerializer,
+)
+from transformers import AutoTokenizer
 
 
 celery_app = Celery(
@@ -107,8 +117,40 @@ def create_converter() -> DocumentConverter:
 
 
 @worker_process_init.connect
-def preload_models(**kwargs):
+def preload_converter(**kwargs):
     create_converter()
+
+
+# derfault serializer do "row,col=value"
+# this fails if req say row,(col,col,col)=value"abs
+# thats why this req, it preserves grid, but uses more tokens
+class MarkdownTableSerializerProvider(ChunkingSerializerProvider):
+    def get_serializer(self, doc):
+        return ChunkingDocSerializer(
+            doc=doc,
+            table_serializer=MarkdownTableSerializer(),
+            params=MarkdownParams(compact_tables=True),
+            # very imp, compact tables removes padding, quite uncessary
+            # default is actually false.
+        )
+
+
+def create_chunker():
+    chunker = HybridChunker(
+        tokenizer=HuggingFaceTokenizer(
+            tokenizer=AutoTokenizer.from_pretrained(settings().EMBED_MODEL_ID),
+            max_tokens=settings().MAX_TOKENS,
+        ),
+        merge_peers=True,  # merges undersized sibling chunks
+        repeat_table_header=True,  # each split chunk gets the header row re-attached
+        serializer_provider=MarkdownTableSerializerProvider(),
+    )
+    set_chunker(chunker)
+
+
+@worker_process_init.connect
+def preload_chunker(**kwargs):
+    create_chunker()
 
 
 """

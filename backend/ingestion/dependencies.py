@@ -1,3 +1,4 @@
+from docling_core.transforms.chunker import HybridChunker
 from docling.document_converter import DocumentConverter
 import boto3
 from boto3.s3.transfer import TransferConfig
@@ -34,3 +35,16 @@ def get_converter() -> DocumentConverter:
 def set_converter(converter: DocumentConverter):
     global _converter
     _converter = converter
+
+
+_chunker: HybridChunker | None = None
+
+
+def get_chunker() -> HybridChunker:
+    assert _chunker is not None, "_chunker not init"
+    return _chunker
+
+
+def set_chunker(chunker: HybridChunker):
+    global _chunker
+    _chunker = chunker
