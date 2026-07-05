@@ -100,14 +100,15 @@ def process_document_task(
         chunks = chunker.chunk(doc)  # type-> iterrator[basechunk]
         # all chunks have not computed yet, this is a generator, use next(),
 
+        docService = get_DocService()
+
         async def persist_document_data():
-            docService = get_DocService()
             doc_id = await docService.register_document(
                 user_id=user_id,
                 s3_key=object_key,
                 filename=filename,
                 content_hash=document_hash,
-                docling_doc_uri="",  # Populated if exporting Docling JSON to S3
+                docling_doc_uri="",  # Populated if exporting converter output to S3
                 embedding_model=embedding_model,
                 embedding_dim=embedding_dim,
                 error=error,
@@ -122,3 +123,24 @@ def process_document_task(
     finally:
         get_boto3_client().delete_object(Bucket=bucket, Key=object_key)
         os.unlink(local_path)
+
+
+"""
+asyncpg.create_pool uses asyncio.
+asyncio creates a internal event loop which is tied to asyncio.
+every connection in that pool object, uses same event loop.
+
+if we do asyncio.run(persist_document_data()), 
+it creates a new event loop, uses pool object in that event loop.
+but pool was tied to the loop it created during init,
+or say in use, so we get error like
+"cannot perform operation: another operation is in progress"
+
+we can do like asyncio.run(
+first init-> use pool -> close it/or just return
+)
+
+every lib which uses asyncio in bg uses same event loop,
+its a rule in python else causes runtime errors or race condition.
+
+"""

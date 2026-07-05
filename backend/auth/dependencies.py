@@ -42,6 +42,20 @@ def get_redis_pool() -> redis.Redis:
     return _redis_pool
 
 
+# using import M -> now all module level vars in M are shared
+# if M.var reassigned or mutated, will be seen everywhere.vars
+
+# immutable objects when copied are not bind
+# mutalbe objects when copied are binded.
+
+# using from M import x -> it mainly doing x=M.x
+# now if x is immuable, changes are not shared.
+# thats why these pool vars req setter/getter functions.
+
+# if x mutable, only for mutating changes are shared.
+# if reassigned loses link to M.x, changes no longer shared.
+
+
 _pool: asyncpg.Pool | None = None
 
 

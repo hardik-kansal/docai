@@ -135,3 +135,24 @@ class DocRepository:
                 user_id,
                 content_hash,
             )
+
+
+"""
+for inserting into pg, there are multiple ways
+1. single insert, slowest
+2. multi row insert, fast for batch, performance depends machine to machine bz of batch size
+3. copy fastest among these, does not parse sql, cant add conditional code
+4. copy with merging-
+Most time gets into parsing multiple sql, and network time, pg server is fast enough though.
+through copy parsing eliminated.
+copy millions without any condition into temporary table, then merge this table with main
+with conditons.
+copy with merging is very fast, took 22min for a job which insert one row took 14hr.
+
+staging table is temp based-> means remains for per one active connection, and avoid WAL,
+so pg truncates them in crash
+
+we can also do copy with (merging in batches).
+
+
+"""
