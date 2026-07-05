@@ -28,6 +28,7 @@ class Settings(BaseSettings):
 
     EMBED_MODEL_ID: str
     MAX_TOKENS: int
+    EMBED_MODEL_DIM: int
 
 
 @lru_cache(maxsize=1)

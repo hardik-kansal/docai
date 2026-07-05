@@ -1,71 +1,66 @@
-# ==========================
-# Stage 1 - Build dependencies
-# ==========================
+# syntax=docker/dockerfile:1.7
 
-# Official Python image (Python 3.12 on Debian 12 Slim)
+############################
+# Stage 1: build deps
+############################
 FROM python:3.12-slim-bookworm AS builder
 
-# Install packages needed only while building
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UV_CACHE_DIR=/cache/uv \
+    VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libpq-dev \
     libmagic1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy uv executable
-COPY --from=ghcr.io/astral-sh/uv:0.4.10 /uv /bin/uv
+COPY --from=ghcr.io/astral-sh/uv:0.11 /uv /bin/uv
 
-# All future commands run inside /app
 WORKDIR /app
 
-# Create a virtual environment
 RUN uv venv .venv
 
-# Use the virtual environment automatically
-ENV VIRTUAL_ENV=/app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-
-# Copy dependency files first
-# Docker won't reinstall packages if only your source code changes
 COPY pyproject.toml uv.lock ./
 
-# Install production dependencies
-RUN uv sync --frozen --no-dev
+RUN --mount=type=cache,id=uv-cache,target=/cache/uv,sharing=locked \
+    uv sync --frozen --no-dev --no-install-project
+
+COPY backend ./backend
+COPY alembic.ini ./
+
+RUN --mount=type=cache,id=uv-cache,target=/cache/uv,sharing=locked \
+    uv sync --frozen --no-dev
 
 
-# ==========================
-# Stage 2 - Runtime
-# ==========================
+############################
+# Stage 2: runtime
+############################
+FROM python:3.12-slim-bookworm AS runner
 
-FROM python:3.12-slim-bookworm As runner
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    VIRTUAL_ENV=/app/.venv \
+    PATH="/app/.venv/bin:$PATH"
 
-# Only runtime libraries
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 \
     curl \
+    libmagic1 \
     && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -u 10001 appuser
 
 WORKDIR /app
 
-ENV VIRTUAL_ENV=/app/.venv
-ENV PATH="/app/.venv/bin:$PATH"
-ENV PYTHONUNBUFFERED=1
-
-# Create a non-root user
-RUN useradd -m appuser
-
-# Copy installed packages
 COPY --from=builder /app/.venv /app/.venv
-
-# Copy application source
-COPY --chown=appuser backend ./backend
-COPY --chown=appuser alembic.ini .
+COPY --from=builder --chown=appuser:appuser /app/backend /app/backend
+COPY --from=builder --chown=appuser:appuser /app/alembic.ini /app/alembic.ini
 
 USER appuser
 
 EXPOSE 8000
 
-# Start FastAPI
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
-
-

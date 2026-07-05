@@ -3,7 +3,14 @@ from ..config import settings
 from celery.signals import worker_process_init
 import boto3
 from botocore.config import Config
-from .dependencies import set_boto3_client, set_converter, set_chunker
+from .dependencies import (
+    set_boto3_client,
+    set_converter,
+    set_chunker,
+    set_asyncpg_pool,
+    asyncpg,
+    init_pg_connection,
+)
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (
@@ -23,7 +30,7 @@ from docling_core.transforms.serializer.markdown import (
     MarkdownTableSerializer,
 )
 from transformers import AutoTokenizer
-
+import asyncio
 
 celery_app = Celery(
     "project1_celery",  # just application name
@@ -34,22 +41,25 @@ celery_app = Celery(
     ],  # file where tasks are there, need before runtime
 )
 
+# celery does not use threads inside, each worker assigns one task, with just master thread
 celery_app.conf.update(
     # Serialization — JSON only, never pickle which is defualt (security issue)
     # pickle.loads/dumps -> convert anything into bytes, so might also convert malacious code.
     task_serializer="json",  # when using delay() to store task in redis
-    result_serializer="json",  # return value of func when run by worker stored in redis as json
+    result_serializer="json",  # return value of func when run by worker
     accept_content=[
         "json"
     ],  # when worker picks up task from redis to run, accepts json
     # suppose one worker process crashes, could not even tell redis about this through ack_late
-    # redis will handover this task if it doesnt listen ack form that worker process in this time.
+    # redis will handover this task if it doesnt listen ack_late form that worker process in this time.
     broker_transport_options={"visibility_timeout": 3600},  # 1hr
     # must be large enough than task processing time,
     #  else two workers would be doing duplicate tasks
-    task_acks_late=True,  # this make sure when task completed only then worker send ack
+    # this make sure when task completed only then worker send ack_sucess
+    task_acks_late=True,
     task_reject_on_worker_lost=True,  # if recived ack_late, handover to another by requeue
-    # One task per worker process, else celery might assign many to one worker, others sit idle
+    # One task per worker process,
+    # else celery might assign many to one worker, while others are still idle
     worker_prefetch_multiplier=1,
     # this task will go to ingestion queue.
     task_routes={
@@ -75,16 +85,21 @@ celery_app.conf.update(
 
 first Celery Master process starts up, it runs code that tell os
 -> Hey kernel, take an exact snapshot of me right now, 
-clone it, and paste it into a brand new, independent memory space.
--> master process uses os fork()
+clone it, and paste it into a brand new, independent memory space using os fork()
 -> The OS gives them their own unique PIDs and isolated memory blocks.
 -> after that detaches this pid from master, 
 -> and runs each child as a complete unrealted seperate process not threads
 
+
+Now Each worker process is an independent Python process with:
+
+its own memory
+its own GIL
+but share same filesystem -> not idompotent
 """
 
 
-# runs only once, before child process accepts its first task
+# runs only once, before child process accepts its first task, boto3 is sync lib
 @worker_process_init.connect
 def init_worker_s3(**kwargs):
     client = boto3.client(
@@ -96,6 +111,27 @@ def init_worker_s3(**kwargs):
         config=Config(retries={"max_attempts": 3, "mode": "adaptive"}),
     )
     set_boto3_client(client)
+
+
+# Create one event loop for this worker process, so now
+# one worker,sep process completely,
+#  handles one task,
+#  one main thread no child threads (os dont create threads by itself, lib do)
+# since cerlry is sync,
+# with one event loop running
+
+
+@worker_process_init.connect
+def init_worker_db(**kwargs):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    pool = loop.run_until_complete(
+        asyncpg.create_pool(
+            dsn=settings().DB_URL, min_size=2, max_size=10, init=init_pg_connection
+        )
+    )
+    set_asyncpg_pool(pool)
 
 
 def create_converter() -> DocumentConverter:

@@ -44,3 +44,4 @@ redis_data/
 .idea/
 .DS_Store
 README.md
+tests/

@@ -22,7 +22,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.execute(
         """
-        CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- for gen_random_uuid() if needed later
+        CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- for gen_random_uuid() 
 
         CREATE TABLE users (
             user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- PRIMARY KEY = Automatically indexed
@@ -38,7 +38,7 @@ def upgrade() -> None:
 
 # does not have any .hex() thats why used UUID, (afa-agadg-agadg-adgda11)
 # convert to str using .hex() in User Repository "afaagadgagadgadgda11"
-# uuid.uuid4 is version 4 just, have nothing to do with bytes
+# uuid.uuid4 is version 4 just, have nothing to do with bytes, and its random
 # timestampz is timestamp with timezone.utc
 
 

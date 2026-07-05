@@ -27,7 +27,7 @@ ACCESS_COOKIE = CookieConfig(
 )
 REFRESH_COOKIE = CookieConfig(
     key="refresh_token",
-    max_age=60 * 60 * 24,  # 7 days
+    max_age=60 * 60 * 24 * 7,
     path="/",
     samesite="strict",
 )

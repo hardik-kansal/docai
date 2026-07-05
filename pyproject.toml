@@ -11,7 +11,7 @@ dependencies = [
     "asyncpg>=0.31.0",
     "boto3>=1.43.36",
     "celery>=5.6.3",
-    "docling[vlm]>=2.108.0",
+    "docling>=2.110.0",
     "fastapi[standard]>=0.137.1",
     "make>=0.1.6.post2",
     "psycopg2-binary>=2.9.12",
@@ -28,5 +28,6 @@ dev = [
     "pre-commit>=4.6.0",
     "ruff>=0.15.17",
 ]
+
 
 

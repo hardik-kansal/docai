@@ -7,10 +7,10 @@ for my own knowledge
 
 sudo systemctl start/stop postgresql
 sudo -u postgres psql -> run psql cli with postgres as user(default, no pwd asked)
-CREATE USER hardik WITH PASSWORD 'mypassword';
+CREATE USER hardik WITH PASSWORD 'mypassword'
 GRANT ALL PRIVILEGES ON DATABASE project1 TO hardik;
-\q
-psql -h localhost -U hardik -d project1 ->talk with connection
+\q -> to quit
+psql -U hardik -d project1 -> talk with connection
 
 
 Postgres Server <-> postgres user root requires sudo password
@@ -20,13 +20,12 @@ Postgres Server <-> postgres user root requires sudo password
       │    ├── Table: alembic_version
       │    └── ...
       ├── Schema: auth            ← you could create this
-      │    └── Table: sessions
-      └── Schema: analytics
-           └── Table: query_logs
+           └── Table: sessions
 
 to access a table
 -need url for each db
-- acess via public.users though for public not req explicitly to tell
+- access table via "select * from public.users;"
+- though for public schema, it is not req explicitly to tell
 GRANT ALL PRIVILEGES ON DATABASE only grants connect/create-schema
 we need to give
 sudo -u postgres psql
@@ -48,8 +47,16 @@ alembic upgrade head -> to migrate all not done yet in order
 alembic current -> to get version
 alembic downgrade -1
 
+
+alembic runs migrations in tranaction
+so if any version failed to migrate everything rolls back
+
 psql -h localhost -U hardik -d project1
 \d users -> list structure of table
-\dt -> list all tables
+\d -> list all tables
+
+docker grants all these permissions by default to user DB_USER
+
+
 
 """

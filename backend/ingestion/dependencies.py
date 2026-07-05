@@ -2,6 +2,9 @@ from docling_core.transforms.chunker import HybridChunker
 from docling.document_converter import DocumentConverter
 import boto3
 from boto3.s3.transfer import TransferConfig
+from .services import DocService
+from .repository import DocRepository
+import asyncpg
 
 _s3_client = None
 
@@ -48,3 +51,42 @@ def get_chunker() -> HybridChunker:
 def set_chunker(chunker: HybridChunker):
     global _chunker
     _chunker = chunker
+
+
+_pool: asyncpg.Pool | None = None
+
+
+def set_asyncpg_pool(pool: asyncpg.Pool):
+    global _pool
+    _pool = pool
+
+
+def get_asyncpg_pool() -> asyncpg.Pool:
+    assert _pool is not None, "Postgres pool not initialized"
+    return _pool
+
+
+async def init_pg_connection(conn: asyncpg.Connection):
+    await conn.execute("""
+        CREATE TEMP TABLE staging_chunks (
+            id UUID,
+            document_id UUID,
+            chunk_index INTEGER,
+            text TEXT,
+            contextualized_text TEXT,
+            token_count INTEGER,
+            headings TEXT[],
+            page_numbers INTEGER[],
+            content_hash TEXT
+        ) ON COMMIT PRESERVE ROWS;  
+    """)
+
+
+# async pool client creates connection pool,
+# each connection pool on init creates this table once
+# also since this is temp, no need to add overhead with constraints
+# if something wrong automatically, when copying into actual table, error would occur.
+
+
+def get_DocService() -> DocService:
+    return DocService(DocRepository(get_asyncpg_pool()))

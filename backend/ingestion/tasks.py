@@ -1,7 +1,11 @@
+import asyncio
+import hashlib
+from .dependencies import get_DocService
 from docling.datamodel.base_models import ConversionStatus
 import logging
 from celery import Task
 from .worker import celery_app
+
 from .storage import validate_mime_type
 from .dependencies import (
     get_boto3_client,
@@ -61,55 +65,59 @@ def process_document_task(
     object_key: str,
     user_id: str,
     access_scope: str,
+    filename: str,
+    embedding_model: str,
+    embedding_dim: int,
 ):
     # it downloads in chunks efficiently, to avoid consuming ram
     local_path = f"{self.request.id}.pdf"
+
+    # This is synchronous (blocking). boto3 is sync lib
     get_boto3_client().download_file(
         bucket, object_key, local_path, Config=s3_download_config
     )
 
     try:
+        document_hash = None
         with open(local_path, "rb") as f:
             validate_mime_type(f.read(2048), object_key)
+            f.seek(0)  # Fix: Reset pointer to beginning of file
+            document_hash = hashlib.sha256(f.read()).hexdigest()
 
-        result = get_converter().convert(local_path)
+        result = get_converter().convert(local_path)  # 3 sec for one page
+        # ram peaks here, complete file into ram, can do batch but bad results
+        error = None
         if result.status == ConversionStatus.FAILURE:
             raise ValueError(f"Docling conversion failed: {result.errors}")
         elif result.status == ConversionStatus.PARTIAL_SUCCESS:
+            # some text did not parsed, doesnt mean these are images, or something else
+            error = json.dumps(result.errors, default=str)
             for err in result.errors:
                 logger.warning(err.error_message)
 
         doc = result.document  # everything in ram
-        with open("attention_chunks2", "w") as f:
-            f.write(json.dumps(doc, default=str))
-        chunker = get_chunker()  # fast enough, init before this worker started
+        chunker = get_chunker()  # 13ms for one page
+        chunks = chunker.chunk(doc)  # type-> iterrator[basechunk]
+        # all chunks have not computed yet, this is a generator, use next(),
 
-        chunks = chunker.chunk(doc)  # this is a generator, use next()
-        # all chunks have not computed yet
+        async def persist_document_data():
+            docService = get_DocService()
+            doc_id = await docService.register_document(
+                user_id=user_id,
+                s3_key=object_key,
+                filename=filename,
+                content_hash=document_hash,
+                docling_doc_uri="",  # Populated if exporting Docling JSON to S3
+                embedding_model=embedding_model,
+                embedding_dim=embedding_dim,
+                error=error,
+            )
 
-        """
-        chunks -
-                text
-                meta -  
-                    docMeta -
-                            docItems per para
-                    captions
-                    headings
-                    origin 
-        """
+            await docService.add_chunks_to_db(
+                chunks=chunks, chunker=chunker, document_id=doc_id
+            )
 
-        records = [
-            {
-                "text_for_display": chunk.text,
-                "text_for_embedding": chunker.contextualize(chunk),
-                "headings": chunk.meta.headings,
-                "doc_items": chunk.meta.doc_items,
-            }
-            for chunk in chunks
-        ]
-
-        with open("attention_chunks1", "w") as f:
-            f.write(json.dumps(records, default=str))
+        asyncio.get_event_loop().run_until_complete(persist_document_data())
 
     finally:
         get_boto3_client().delete_object(Bucket=bucket, Key=object_key)

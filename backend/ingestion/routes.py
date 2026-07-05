@@ -52,7 +52,6 @@ async def minio_webhook(
     queued = []
 
     for record in records:
-        logger.debug(records)
         event_name: str = record.get("eventName", "")
         if "ObjectCreated" not in event_name:
             continue  # Ignore delete/copy events
@@ -60,7 +59,7 @@ async def minio_webhook(
         s3_info = record.get("s3", {})
         bucket = s3_info.get("bucket", {}).get("name", None)
         obj_key = unquote(s3_info.get("object", {}).get("key", None))
-        # uploads%2Fuser_id%2Ffilename -> unquote url decode the string
+        # uploads%2Fuser_id%2Fuuid%2Ffilename -> unquote url decode the string
 
         obj_size = s3_info.get("object", {}).get("size", 0)
         # if obj_size > settings.max_file_size_bytes:
@@ -79,6 +78,9 @@ async def minio_webhook(
             object_key=obj_key,
             user_id=obj_key.split("/")[1],
             access_scope="default",
+            filename=obj_key.split("/")[3],
+            embedding_model=settings.EMBED_MODEL_ID,
+            embedding_dim=settings.EMBED_MODEL_DIM,
         )
         """
         celery does not excecute immediately when delay() is called, instead create this json
@@ -98,7 +100,15 @@ async def minio_webhook(
 
 
 """
-record structure
+
+header ssend by s3 using webhook
+{
+ 'host': 'host.docker.internal:8000',
+ 'user-agent': 'Go-http-client/1.1', 
+ 'content-length': '1109', 
+ 'content-type': 'application/json'
+ }
+records in body
 "[
 {'eventVersion': '2.0', 
 'eventSource': 'minio:s3',
@@ -143,12 +153,6 @@ record structure
 }
 
 
-header
-{
- 'host': 'host.docker.internal:8000',
- 'user-agent': 'Go-http-client/1.1', 
- 'content-length': '1109', 
- 'content-type': 'application/json'
- }
+
 
 """
