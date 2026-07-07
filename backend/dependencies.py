@@ -26,3 +26,7 @@ async def call_with_retry(
     ):
         with attempt:
             return await fn(*args, **kwargs)
+
+
+# use only with those apis/lib/sdks which dont have defualt retry logic
+# like mostly use with qdrant it doestn have any. not with pg, redis, s3

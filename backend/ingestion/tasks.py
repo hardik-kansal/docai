@@ -154,7 +154,7 @@ def process_document_task(
                 chunk_ids = [row[0] for row in db_batch]  # uuid.UUID
                 texts = [row[4] for row in db_batch]  # contextualized_text
 
-                # v is numpy array of floats
+                # v is numpy array of floats, sync cpu heavy
                 start_time = time.perf_counter()
                 vectors: list[list[float]] = [
                     v.tolist() for v in embed_model.embed(texts)
@@ -165,7 +165,7 @@ def process_document_task(
                 points = [
                     PointStruct(
                         id=str(chunk_id),
-                        vector=vector,
+                        vector={"dense": vector},
                         payload={
                             "document_id": str(doc_id),
                             "chunk_index": db_batch[i][2],
@@ -181,7 +181,7 @@ def process_document_task(
                 start_time = time.perf_counter()
                 await call_with_retry(
                     vector_pool.upsert,
-                    budget_s=5,  # 5seconds
+                    budget_s=10,  # seconds
                     collection_name=settings().COLLECTION,
                     points=points,
                     wait=False,

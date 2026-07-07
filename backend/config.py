@@ -29,9 +29,10 @@ class Settings(BaseSettings):
     EMBED_MODEL_ID: str
     MAX_TOKENS: int
     EMBED_MODEL_DIM: int
+    RERANK_MODEL_ID: str
 
     QDRANT_URL: str
-    COLLECTION: str = "contracts"
+    COLLECTION: str = "contract"
 
 
 @lru_cache(maxsize=1)

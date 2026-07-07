@@ -137,10 +137,16 @@ async def init_clients():
     if not await vectorPool.collection_exists(name):
         await vectorPool.create_collection(
             collection_name=name,
-            vectors_config=models.VectorParams(
-                size=settings().EMBED_MODEL_DIM, distance=models.Distance.COSINE
-            ),
+            vectors_config={
+                "dense": models.VectorParams(
+                    size=settings().EMBED_MODEL_DIM, distance=models.Distance.COSINE
+                )
+            },
+            sparse_vectors_config={
+                "sparse": models.SparseVectorParams(modifier=models.Modifier.IDF)
+            },
         )
+        # value,keys are str matched
         for field, schema in [
             ("user_id", models.PayloadSchemaType.KEYWORD),
             ("document_id", models.PayloadSchemaType.KEYWORD),

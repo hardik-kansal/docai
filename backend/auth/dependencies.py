@@ -81,7 +81,7 @@ def get_auth_service() -> AuthService:
 
 @dataclass(frozen=True, slots=True)
 class User:
-    user_id: int
+    user_id: str
     scopes: list[AccessScope]
 
 
@@ -95,6 +95,8 @@ async def get_current_user(
         raise HTTPException(status_code=400, detail="user not logged in")
 
     try:
+        if access_jwt is None:
+            raise ExpiredSignatureError("access cookie absent")
         access_payload = tokens._decode_token(access_jwt, expected_type="access")
     except Exception:
         logger.warning("access token expired attempting refresh")

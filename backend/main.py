@@ -1,7 +1,11 @@
+from qdrant_client import AsyncQdrantClient, models
+from fastembed import TextEmbedding
+from fastembed.rerank.cross_encoder import TextCrossEncoder
 from fastapi import FastAPI, Depends
 from typing import Annotated
 from .auth.routes import router as auth_router
 from .ingestion.routes import router as s3_router
+from .query.routes import router as query_router
 from contextlib import asynccontextmanager
 from .config import settings
 from .logging_config import RouteMiddleware
@@ -14,7 +18,14 @@ from .auth.dependencies import (
     get_current_user,
     User,
 )
-from .ingestion.dependencies import set_boto3_client, get_boto3_client
+from .ingestion.dependencies import (
+    set_boto3_client,
+    get_boto3_client,
+    set_embedModel,
+    set_vectorPool,
+    get_vectorPool,
+)
+from .query.dependencies import set_reranker
 import asyncpg
 import logging
 import time
@@ -110,6 +121,41 @@ def s3_start() -> boto3.client:
     set_boto3_client(client)
 
 
+def embed_model():
+    embedModel = TextEmbedding(model_name=settings().EMBED_MODEL_ID)
+    set_embedModel(embedModel)
+
+
+def reranker_start():
+    reranker = TextCrossEncoder(model_name=settings().RERANK_MODEL_ID)
+    set_reranker(reranker)
+
+
+async def vector_db_start():
+    vectorPool = AsyncQdrantClient(url=settings().QDRANT_URL, check_compatibility=False)
+    name = settings().COLLECTION
+    if not await vectorPool.collection_exists(name):
+        await vectorPool.create_collection(
+            collection_name=name,
+            vectors_config={
+                "dense": models.VectorParams(
+                    size=settings().EMBED_MODEL_DIM, distance=models.Distance.COSINE
+                )
+            },
+            sparse_vectors_config={
+                "sparse": models.SparseVectorParams(modifier=models.Modifier.IDF)
+            },
+        )
+        for field, schema in [
+            ("user_id", models.PayloadSchemaType.KEYWORD),
+            ("document_id", models.PayloadSchemaType.KEYWORD),
+        ]:
+            await vectorPool.create_payload_index(
+                name, field_name=field, field_schema=schema
+            )
+    set_vectorPool(vectorPool)
+
+
 # runs all functions even if any crashed
 # ELSE req nested way, close redis, use finally close pg, use finally, so on
 async def shutdown_all_services():
@@ -118,7 +164,8 @@ async def shutdown_all_services():
         #  will execute in REVERSE order (Last in, First out).
         stack.push_async_callback(get_asyncpg_pool().close)
         stack.push_async_callback(get_redis_pool().aclose)
-        stack.push_async_callback(get_boto3_client().close)
+        stack.push_async_callback(get_vectorPool().close)
+        stack.callback(get_boto3_client().close)  # boto3 is sync
         # if passed as .close() executes immediately
 
 
@@ -126,7 +173,10 @@ async def shutdown_all_services():
 async def lifespan(app: FastAPI):
     await redis_start()
     await pg_start()
+    await vector_db_start()
     s3_start()
+    embed_model()
+    reranker_start()
 
     # before startup
     yield
@@ -141,6 +191,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(s3_router)
+app.include_router(query_router)
 app.add_middleware(RouteMiddleware)
 
 
