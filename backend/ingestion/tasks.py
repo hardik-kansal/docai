@@ -5,6 +5,7 @@ from docling.datamodel.base_models import ConversionStatus
 import logging
 from celery import Task
 from .worker import celery_app
+import time
 
 from .storage import validate_mime_type
 from .dependencies import (
@@ -79,10 +80,22 @@ def process_document_task(
 
     try:
         document_hash = None
+        start_time = time.perf_counter()
         with open(local_path, "rb") as f:
             validate_mime_type(f.read(2048), object_key)
             f.seek(0)  # Fix: Reset pointer to beginning of file
             document_hash = hashlib.sha256(f.read()).hexdigest()
+        print(time.perf_counter() - start_time)
+        docService = get_DocService()
+
+        async def check_if_duplicate_document() -> bool:
+            return await docService.check_document(user_id, document_hash)
+
+        is_duplicate = asyncio.get_event_loop().run_until_complete(
+            check_if_duplicate_document()
+        )
+        if is_duplicate:
+            return
 
         result = get_converter().convert(local_path)  # 3 sec for one page
         # ram peaks here, complete file into ram, can do batch but bad results
@@ -96,11 +109,9 @@ def process_document_task(
                 logger.warning(err.error_message)
 
         doc = result.document  # everything in ram
-        chunker = get_chunker()  # 13ms for one page
+        chunker = get_chunker()
         chunks = chunker.chunk(doc)  # type-> iterrator[basechunk]
         # all chunks have not computed yet, this is a generator, use next(),
-
-        docService = get_DocService()
 
         async def persist_document_data():
             doc_id = await docService.register_document(

@@ -98,63 +98,7 @@ Dockerized service + Postgres/pgvector + Redis via Docker Compose locally; GitHu
 
 
 
-=======================================================================================================================
-                            LOCAL DEVELOPMENT PIPELINE (WITH LIBRARY ECOSYSTEMS)
-=======================================================================================================================
 
- ➊ DATA INGESTION
- ────────────────
-   [ BROWSER CLIENT ] 
-          │
-          │  1. Request Upload URL (GET /get-upload-url?filename=book.pdf)
-          ▼
-   [ FastAPI APPLICATION ] (Port 8000)
-          │  
-          │  ⚡ Uses library: `boto3` (AWS SDK for Python)
-          │  2. Calls: s3_client.generate_presigned_url('put_object', ...)
-          │  
-          ▼
-   [ BROWSER CLIENT ]
-          │
-          │  3. Receives cryptographic Pre-signed URL string
-          │  4. Runs Frontend code: `fetch(presigned_url, { method: 'PUT', body: fileFile })`
-          ▼
- ➋ LOCAL STORAGE ENGINE
- ──────────────────────
-   ┌────────────────────────────────────────────────────────┐
-   │ MinIO CONTAINER (Port 9000 API / Port 9001 Console)    │ ◄── Managed via [ Docker Compose ]
-   └────────────────────────────────────────────────────────┘
-          │
-          │  5. File upload completes successfully
-          │  6. Fires a Webhook Bucket Notification instantly to FastAPI
-          ▼
- ➌ TASKS BUFFERING & QUEUEING
- ─────────────────────────────
-   [ FastAPI APPLICATION ] (Port 8000 Webhook Router)
-          │
-          │  ⚡ Uses framework: `Celery` (Distributed Task Queue)
-          │  7. Offloads heavy job: process_pdf_task.delay(bucket, file_key)
-          ▼
-   ┌────────────────────────────────────────────────────────┐
-   │ REDIS CONTAINER (Port 6379 Broker)                     │ ◄── Acts as the message ticker board
-   └────────────────────────────────────────────────────────┘
-          │
-          │  8. Holds message ticket until background worker grabs it
-          ▼
- ➍ BACKGROUND WORKER PROCESSING
- ──────────────────────────────
-   [ CELERY WORKER PROCESS ] (Running standalone in a terminal window)
-          │
-          │  9. Pulls message ticket out of Redis queue
-          │
-          │  ⚡ Uses storage client: `boto3`
-          │ 10. Sends HTTP Range Request header: "Range: bytes=0-4096"
-          ▼
-   [ MinIO CONTAINER ] (Port 9000)
-          │
-          │ 11. Returns HTTP 206 Partial Content (Only header metadata)
-          ▼
-   [ CELERY WORKER RAM BUFFER ]
           │
           │ 
           
