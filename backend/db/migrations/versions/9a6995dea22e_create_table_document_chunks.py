@@ -23,7 +23,7 @@ def upgrade() -> None:
 
     CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- for gen_random_uuid() 
 
-    CREATE TABLE documents (
+    CREATE TABLE IF NOT EXISTS documents(
         id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         user_id         UUID NOT NULL REFERENCES users(user_id),
         s3_key          TEXT NOT NULL,
@@ -40,7 +40,7 @@ def upgrade() -> None:
     );
     CREATE UNIQUE INDEX ux_documents_user_hash ON documents(user_id, content_hash);
 
-CREATE TABLE chunks (
+CREATE TABLE IF NOT EXISTS chunks (
     id                   UUID PRIMARY KEY,   -- deterministic, see below — same value used as Qdrant point id
     document_id          UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
     chunk_index          INT NOT NULL,

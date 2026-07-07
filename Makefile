@@ -1,6 +1,7 @@
 docker-start:
-	docker compose down
-	docker compose up --build -d postgres redis migrate minio 
+	docker compose up -d postgres redis minio qdrant
+
+minio-hook:
 	docker exec local_minio mc alias set local http://localhost:9000 hardik password
 	docker exec local_minio mc event add local/contracts arn:minio:sqs::FASTAPI:webhook --event put -p
 # mc is minio command tool, sqs is aws simple queue service	
@@ -19,6 +20,7 @@ docker-start:
 # 	DD_VERSION="0.1.0" \
 #   	uv run ddtrace-run uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
+#rm -rf /tmp/fastembed_cache/ use this when using a diff embedding model
 celery-start:
 	uv run celery -A backend.ingestion.worker.celery_app worker -E -Q ingestion -l info --concurrency=4
 

@@ -10,6 +10,8 @@ from .dependencies import (
     set_asyncpg_pool,
     asyncpg,
     init_pg_connection,
+    set_vectorPool,
+    set_embedModel,
 )
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
@@ -31,6 +33,9 @@ from docling_core.transforms.serializer.markdown import (
 )
 from transformers import AutoTokenizer
 import asyncio
+from qdrant_client import AsyncQdrantClient, models
+from fastembed import TextEmbedding
+
 
 celery_app = Celery(
     "project1_celery",  # just application name
@@ -121,20 +126,43 @@ def init_worker_s3(**kwargs):
 # with one event loop running
 
 
-@worker_process_init.connect
-def init_worker_db(**kwargs):
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    pool = loop.run_until_complete(
-        asyncpg.create_pool(
-            dsn=settings().DB_URL, min_size=2, max_size=10, init=init_pg_connection
-        )
+async def init_clients():
+    pool = await asyncpg.create_pool(
+        dsn=settings().DB_URL, min_size=2, max_size=10, init=init_pg_connection
     )
     set_asyncpg_pool(pool)
 
+    vectorPool = AsyncQdrantClient(url=settings().QDRANT_URL)
+    name = settings().COLLECTION
+    if not await vectorPool.collection_exists(name):
+        await vectorPool.create_collection(
+            collection_name=name,
+            vectors_config=models.VectorParams(
+                size=settings().EMBED_MODEL_DIM, distance=models.Distance.COSINE
+            ),
+        )
+        for field, schema in [
+            ("user_id", models.PayloadSchemaType.KEYWORD),
+            ("document_id", models.PayloadSchemaType.KEYWORD),
+        ]:
+            await vectorPool.create_payload_index(
+                name, field_name=field, field_schema=schema
+            )
+    set_vectorPool(vectorPool)
 
-def create_converter() -> DocumentConverter:
+    embedModel = TextEmbedding(model_name=settings().EMBED_MODEL_ID)
+    set_embedModel(embedModel)
+
+
+@worker_process_init.connect
+def init_worker_clients(**kwargs):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(init_clients())
+
+
+@worker_process_init.connect
+def preload_converter(**kwargs):
     pipeline_options = PdfPipelineOptions()
     pipeline_options.do_ocr = False
     pipeline_options.do_table_structure = True
@@ -152,11 +180,6 @@ def create_converter() -> DocumentConverter:
     set_converter(converter)
 
 
-@worker_process_init.connect
-def preload_converter(**kwargs):
-    create_converter()
-
-
 # derfault serializer do "row,col=value"
 # this fails if req say row,(col,col,col)=value"abs
 # thats why this req, it preserves grid, but uses more tokens
@@ -171,7 +194,8 @@ class MarkdownTableSerializerProvider(ChunkingSerializerProvider):
         )
 
 
-def create_chunker():
+@worker_process_init.connect
+def preload_chunker(**kwargs):
     chunker = HybridChunker(
         tokenizer=HuggingFaceTokenizer(
             tokenizer=AutoTokenizer.from_pretrained(settings().EMBED_MODEL_ID),
@@ -182,11 +206,6 @@ def create_chunker():
         serializer_provider=MarkdownTableSerializerProvider(),
     )
     set_chunker(chunker)
-
-
-@worker_process_init.connect
-def preload_chunker(**kwargs):
-    create_chunker()
 
 
 """

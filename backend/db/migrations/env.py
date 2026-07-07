@@ -10,7 +10,7 @@ from alembic import context
 config = context.config
 
 config.set_main_option(
-    "sqlalchemy.url", "postgresql://hardik:mypassword@postgres:5432/project1"
+    "sqlalchemy.url", "postgresql://hardik:mypassword@localhost:5432/project1"
 )
 
 # Interpret the config file for Python logging.

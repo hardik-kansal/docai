@@ -24,7 +24,7 @@ def upgrade() -> None:
         """
         CREATE EXTENSION IF NOT EXISTS "pgcrypto";  -- for gen_random_uuid() 
 
-        CREATE TABLE users (
+        CREATE TABLE IF NOT EXISTS users (
             user_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),  -- PRIMARY KEY = Automatically indexed
             username  TEXT NOT NULL UNIQUE,  -- UNIQUE = Automatically indexed
             password_hash TEXT NOT NULL,

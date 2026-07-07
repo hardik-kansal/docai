@@ -1,3 +1,5 @@
+from fastembed import TextEmbedding
+from qdrant_client import AsyncQdrantClient
 from docling_core.transforms.chunker import HybridChunker
 from docling.document_converter import DocumentConverter
 import boto3
@@ -90,3 +92,29 @@ async def init_pg_connection(conn: asyncpg.Connection):
 
 def get_DocService() -> DocService:
     return DocService(DocRepository(get_asyncpg_pool()))
+
+
+_vectorPool: AsyncQdrantClient | None = None
+
+
+def get_vectorPool() -> AsyncQdrantClient:
+    assert _vectorPool is not None, "_vectorPool not init"
+    return _vectorPool
+
+
+def set_vectorPool(vectorPool: AsyncQdrantClient):
+    global _vectorPool
+    _vectorPool = vectorPool
+
+
+_embedModel: TextEmbedding | None = None
+
+
+def get_embedModel() -> TextEmbedding:
+    assert _embedModel is not None, "_embedModel not init"
+    return _embedModel
+
+
+def set_embedModel(embedModel: TextEmbedding):
+    global _embedModel
+    _embedModel = embedModel

@@ -13,9 +13,15 @@ from .dependencies import (
     s3_download_config,
     get_converter,
     get_chunker,
+    get_vectorPool,
+    get_embedModel,
 )
 import os
 import json
+import itertools
+from qdrant_client.models import PointStruct
+from ..config import settings
+from ..dependencies import call_with_retry
 
 
 logger = logging.getLogger(__name__)
@@ -83,19 +89,21 @@ def process_document_task(
         start_time = time.perf_counter()
         with open(local_path, "rb") as f:
             validate_mime_type(f.read(2048), object_key)
-            f.seek(0)  # Fix: Reset pointer to beginning of file
+            f.seek(0)
             document_hash = hashlib.sha256(f.read()).hexdigest()
-        print(time.perf_counter() - start_time)
+        print("document hashing time")
+        print((time.perf_counter() - start_time) * 1000)
         docService = get_DocService()
 
-        async def check_if_duplicate_document() -> bool:
-            return await docService.check_document(user_id, document_hash)
+        # async def check_if_duplicate_document() -> bool:
+        #     return await docService.check_document(user_id, document_hash)
 
-        is_duplicate = asyncio.get_event_loop().run_until_complete(
-            check_if_duplicate_document()
-        )
-        if is_duplicate:
-            return
+        # is_duplicate = asyncio.get_event_loop().run_until_complete(
+        #     check_if_duplicate_document()
+        # )
+        # if is_duplicate:
+        #     return  # what if document added chunks failed
+        #     # not idompotent
 
         result = get_converter().convert(local_path)  # 3 sec for one page
         # ram peaks here, complete file into ram, can do batch but bad results
@@ -114,20 +122,75 @@ def process_document_task(
         # all chunks have not computed yet, this is a generator, use next(),
 
         async def persist_document_data():
+            start_time = time.perf_counter()
             doc_id = await docService.register_document(
                 user_id=user_id,
                 s3_key=object_key,
                 filename=filename,
                 content_hash=document_hash,
-                docling_doc_uri="",  # Populated if exporting converter output to S3
+                docling_doc_uri="",
                 embedding_model=embedding_model,
                 embedding_dim=embedding_dim,
                 error=error,
             )
+            print("document registering time")
+            print((time.perf_counter() - start_time) * 1000)
 
-            await docService.add_chunks_to_db(
-                chunks=chunks, chunker=chunker, document_id=doc_id
-            )
+            BATCH_SIZE = 100  # keeps RAM flat
+
+            embed_model = get_embedModel()
+            vector_pool = get_vectorPool()
+            enumerated_chunks = enumerate(chunks)
+
+            for chunk_batch in itertools.batched(enumerated_chunks, BATCH_SIZE):
+                db_batch = [
+                    docService.create_record_row(idx, chunk, chunker, doc_id)
+                    for idx, chunk in chunk_batch
+                ]
+                start_time = time.perf_counter()
+                await docService._repo.bulk_upsert_chunks(db_batch)
+                print("chunk upsert time")
+                print((time.perf_counter() - start_time) * 1000)
+                chunk_ids = [row[0] for row in db_batch]  # uuid.UUID
+                texts = [row[4] for row in db_batch]  # contextualized_text
+
+                # v is numpy array of floats
+                start_time = time.perf_counter()
+                vectors: list[list[float]] = [
+                    v.tolist() for v in embed_model.embed(texts)
+                ]
+                print("embedding time")
+                print((time.perf_counter() - start_time) * 1000)
+
+                points = [
+                    PointStruct(
+                        id=str(chunk_id),
+                        vector=vector,
+                        payload={
+                            "document_id": str(doc_id),
+                            "chunk_index": db_batch[i][2],
+                            "text": db_batch[i][3],
+                            "contextualized_text": texts[i],
+                            "headings": db_batch[i][6],
+                            "page_numbers": db_batch[i][7],
+                            "user_id": user_id,
+                        },
+                    )
+                    for i, (chunk_id, vector) in enumerate(zip(chunk_ids, vectors))
+                ]
+                start_time = time.perf_counter()
+                await call_with_retry(
+                    vector_pool.upsert,
+                    budget_s=5,  # 5seconds
+                    collection_name=settings().COLLECTION,
+                    points=points,
+                    wait=False,
+                    # means for any read query doesnt wait,
+                    # so now for all batches in run parallelly
+                    # else would have complete index sequentially batch by batch
+                )
+                print("embeding index time")
+                print((time.perf_counter() - start_time) * 1000)
 
         asyncio.get_event_loop().run_until_complete(persist_document_data())
 

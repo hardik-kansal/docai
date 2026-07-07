@@ -3,7 +3,6 @@ name: project1
 services:
 
   postgres:
-    # 115mb
     image: postgres:16-alpine
     container_name: postgres_db
     restart: unless-stopped
@@ -24,10 +23,10 @@ services:
       interval: 10s # check every
       timeout: 5s  # time to respond for server
       retries: 5  # if not respond, retires
-      start_period: 10s # this check starts after 10s
+      start_period: 5s # this check starts after 10s
 
   redis:
-    # 15mb, if url not given, consider it default
+    # if url not given, consider it default
     image: redis:7.2-alpine
     container_name: redis
     restart: unless-stopped
@@ -49,6 +48,24 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+
+  qdrant:
+    image: qdrant/qdrant:v1.9.7 
+    # latest version images are breaking for payload filters
+    container_name: qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333" 
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+    
 
   migrate:
   # if i placed this inside api service as a command,
@@ -110,6 +127,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      qdrant:
+        condition: service_healthy
+
     healthcheck:
       disable: true
     # labels:
@@ -146,3 +166,4 @@ volumes:
   postgres_data:
   redis_data:
   minio_data:
+  qdrant_data:

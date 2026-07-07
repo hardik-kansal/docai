@@ -136,20 +136,20 @@ class DocRepository:
                 content_hash,
             )
 
-        async def check_document_exists(
-            self, user_id: uuid.UUID, content_hash: str
-        ) -> bool:
-            result = await self._pool.fetchval(
-                """
+    async def check_document_exists(
+        self, user_id: uuid.UUID, content_hash: str
+    ) -> bool:
+        result = await self._pool.fetchval(
+            """
                 SELECT EXISTS (
                     SELECT 1 FROM documents 
                     WHERE user_id = $1 AND content_hash = $2
                 );
                 """,
-                user_id,
-                content_hash,
-            )
-            return bool(result)
+            user_id,
+            content_hash,
+        )
+        return bool(result)
 
 
 """

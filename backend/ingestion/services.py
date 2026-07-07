@@ -2,7 +2,6 @@ from docling_core.transforms.chunker import BaseChunk, HybridChunker
 import uuid
 from .repository import DocRepository, Chunk
 import hashlib
-from collections.abc import Iterator
 from dataclasses import astuple
 import logging
 
@@ -47,17 +46,6 @@ class DocService:
                 content_hash=hashlib.sha256(contextualized.encode("utf-8")).hexdigest(),
             )
         )
-
-    # if one batch fails, break every batch,
-    async def add_chunks_to_db(
-        self, chunks: Iterator[BaseChunk], chunker: HybridChunker, document_id: uuid
-    ):
-        batch = []
-        for idx, chunk in enumerate(chunks):
-            batch.append(self.create_record_row(idx, chunk, chunker, document_id))
-        await self._repo.bulk_upsert_chunks(batch)
-
-    # generators couldnt be awaitable
 
     async def register_document(
         self,

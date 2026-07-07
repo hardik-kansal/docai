@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     MAX_TOKENS: int
     EMBED_MODEL_DIM: int
 
+    QDRANT_URL: str
+    COLLECTION: str = "contracts"
+
 
 @lru_cache(maxsize=1)
 def settings() -> Settings:
