@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     QDRANT_URL: str
     COLLECTION: str = "contract"
 
+    GEMINI_KEY: str
+    GEMINI_MODEL: str
+
+    system_prompt: str
+
 
 @lru_cache(maxsize=1)
 def settings() -> Settings:

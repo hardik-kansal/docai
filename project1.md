@@ -98,7 +98,18 @@ Dockerized service + Postgres/pgvector + Redis via Docker Compose locally; GitHu
 
 
 
+### Cost/latency layer 
+semantic cache, query router (route trivial queries to a cheap model), per-query token + cost accounting surfaced in the UI.
 
-          │
-          │ 
-          
+
+### Evaluation methodology.
+
+-> Citation enforcement with self-verification; abstention/escalation on low confidence; 
+-> Ragas faithfulness + answer-relevance + context-relevance 
+-> LLM-as-judge for answer quality with identity-bias mitigation (use a different model family as judge than as generator); 
+-> eval gate regression gate fails CI if faithfulness regresses.
+
+
+### Observability strategy.
+
+LangSmith trace of retrieve→rerank→generate→verify for every request; structured logs with a request ID; per-query metrics: retrieval score, faithfulness, latency breakdown (retrieval vs generation), tokens, cost. 

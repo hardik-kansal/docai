@@ -1,3 +1,4 @@
+from ..models.llm_ouput import GroundedAnswer
 import logging
 from typing import Annotated
 
@@ -5,7 +6,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 
 from ..auth.dependencies import get_current_user, User
-from .services import hybrid_search, rerank_results
+from .services import ans_query
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/query")
@@ -23,6 +24,7 @@ class QueryResponse(BaseModel):
 
 
 """
+
 points=[
     ScoredPoint(
         id='uuid5(documet :idx)', 
@@ -41,6 +43,7 @@ points=[
             order_value=None), 
     ScoredPoint(...)
 ]
+
 """
 
 
@@ -48,23 +51,5 @@ points=[
 async def query(
     payload: QueryRequest,
     user: Annotated[User, Depends(get_current_user)],
-) -> QueryResponse:
-    results = await hybrid_search(
-        query_text=payload.query,
-        user=user,
-    )
-    reranked = await rerank_results(
-        query=payload.query,
-        hits=results.points,  # top 40 from RRF fusion
-        top_n=10,
-    )
-    sources = [
-        {
-            "chunk_id": str(hit.id),
-            "retrieval_score": hit.score,  # original RRF score
-            "rerank_score": rerank_score,  # cross-encoder score
-            **hit.payload,
-        }
-        for rerank_score, hit in reranked
-    ]
-    return QueryResponse(answer="", sources=sources)
+) -> GroundedAnswer:
+    return await ans_query(payload.query, user)

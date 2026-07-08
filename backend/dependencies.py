@@ -23,6 +23,7 @@ async def call_with_retry(
         ),  # jittered — avoids synchronized retry storms
         retry=retry_if_exception_type(retryable),
         reraise=True,
+        # else would throw tencaity retry errror rather than application error
     ):
         with attempt:
             return await fn(*args, **kwargs)
@@ -30,3 +31,4 @@ async def call_with_retry(
 
 # use only with those apis/lib/sdks which dont have defualt retry logic
 # like mostly use with qdrant it doestn have any. not with pg, redis, s3
+# open ai sdk have its own retry, expo wait, timeout logic, disable if wanna use your own
