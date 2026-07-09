@@ -1,3 +1,4 @@
+from aiobreaker import CircuitBreakerError
 from google.genai._gaos.types.interactions.interaction import Interaction
 from fastembed import SparseTextEmbedding
 from qdrant_client import models
@@ -6,7 +7,7 @@ from ..ingestion.dependencies import get_embedModel, get_vectorPool
 from ..config import settings
 from ..auth.dependencies import User
 from .dependencies import get_reranker, get_llm
-from ..dependencies import call_with_retry
+from ..dependencies import call_with_retry, get_circuit_breaker
 import asyncio
 from starlette.concurrency import run_in_threadpool
 import logging
@@ -124,8 +125,11 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
         }
         for _, point in reranked
     ]
-
-    llmResponse = await call_llm(query_text, context)
+    try:
+        llmResponse = await call_llm(query_text, context)
+    except CircuitBreakerError:
+        logger.warning("gemini circuit breaker opened")
+        llmResponse = None
     if llmResponse is None:
         return GroundedAnswer(
             answer=AbstainOutput.GENERATION_UNAVAILABLE,
@@ -141,6 +145,7 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
         return GroundedAnswer.model_validate_json(llmResponse.output_text)
 
 
+@get_circuit_breaker()
 async def call_llm(query_text: str, context: list[dict]) -> Interaction:
     ctx_block = "\n\n".join(
         f"""Chunk ID: {c["chunk_id"]}
@@ -158,8 +163,9 @@ async def call_llm(query_text: str, context: list[dict]) -> Interaction:
     # stream,
     # store chats-> response and request for later retrieval.
     try:
+        # have default timeout, retry logic api side
         interaction = get_llm().interactions.create(
-            model="gemini-3.5-flash",
+            model=settings().GEMINI_MODEL,
             input=input_text,
             system_instruction=settings().system_prompt,
             response_format={
@@ -171,7 +177,7 @@ async def call_llm(query_text: str, context: list[dict]) -> Interaction:
         return interaction
     except Exception:
         logger.exception("LLM generation failed")
-        return None
+        raise
 
 
 # # Server-side state (recommended)
@@ -187,3 +193,79 @@ async def call_llm(query_text: str, context: list[dict]) -> Interaction:
 #     previous_interaction_id=interaction1.id,
 # )
 # print("Response 2:", interaction2.output_text)
+
+
+"""
+====== Interaction structure =========
+
+status='completed'
+model='gemini-3.5-flash'
+agent=None 
+id='v1_...' 
+created='2026-07-08T12:28:25Z'
+updated='2026-07-08T12:28:25Z'
+system_instruction=None
+tools=None
+usage=Usage(
+   total_input_tokens=1250,
+   input_tokens_by_modality=[ModalityTokens(modality='text', tokens=1250)], total_cached_tokens=0,
+   cached_tokens_by_modality=None,
+   total_output_tokens=150,
+   output_tokens_by_modality=None,
+   total_tool_use_tokens=0,
+   tool_use_tokens_by_modality=None,
+   total_thought_tokens=217,
+   total_tokens=1617,
+   grounding_tool_count=None)
+response_modalities=None
+response_mime_type=None
+previous_interaction_id=None
+environment_id=None
+service_tier='standard'
+webhook_config=None
+steps=[
+   ThoughtStep(type='thought', signature='...', summary=None),
+   ModelOutputStep(
+       type='model_output',
+       content=[
+           TextContent(
+               text='{
+                   \n  "answer": "During training, label smoothing of value \\u0335_ls = 0.1 was employed. Although this hurts perplexity because the model learns to be more unsure, it improves both accuracy and the BLEU score.",\n 
+                   "citations": [\n   
+                       {\n     
+                       "chunk_id": "1",\n     
+                       "quote": "Label Smoothing During training, we employed label smoothing of value ϵ ls = 0 . 1 [36]. This hurts perplexity, as the model learns to be more unsure, but improves accuracy and BLEU score."\n
+                       }\n 
+                           ],\n 
+                   "confidence": 1.0,\n 
+                   "abstained": false\n
+                       }',
+               type='text',
+               annotations=None
+               )
+               ],
+       error=None)
+   ]
+response_format=None
+environment=None
+generation_config=None
+cached_content=None
+agent_config=None
+input=None
+output_text='{\n 
+   "answer": "During training, label smoothing of value \\u0335_ls = 0.1 was employed. Although this hurts perplexity because the model learns to be more unsure, it improves both accuracy and the BLEU score.",\n 
+   "citations": [\n   
+                   {\n     
+                       "chunk_id": "1",\n     
+                       "quote": "Label Smoothing During training, we employed label smoothing of value ϵ ls = 0 . 1 [36]. This hurts perplexity, as the model learns to be more unsure, but improves accuracy and BLEU score."\n  
+                   }\n
+               ],\n
+ "confidence": 1.0,\n
+  "abstained": false\n
+  }'
+output_image=None
+output_audio=None
+output_video=None
+object='interaction'
+
+"""
