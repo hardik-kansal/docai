@@ -26,7 +26,8 @@ class GroundedAnswer(BaseModel):
 
 
 class AbstainOutput(StrEnum):
-    INPUT_REJECTED = """
+    INPUT_REJECTED = "input_rejected"
+    NO_RELEVANT_CONTEXT = """
     Could not retrieve chunks at the moment..
     """
     GENERATION_UNAVAILABLE = """

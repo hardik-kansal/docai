@@ -1,6 +1,5 @@
 from fastembed.rerank.cross_encoder import TextCrossEncoder
 from google import genai
-from ..config import settings
 
 
 _reranker: TextCrossEncoder | None = None
@@ -16,8 +15,14 @@ def set_reranker(reranker: TextCrossEncoder) -> None:
     _reranker = reranker
 
 
-_client = genai.Client(api_key=settings().GEMINI_KEY)
+_client: genai.Client | None = None
 
 
 def get_llm() -> genai.Client:
+    assert _client is not None, "_client not initialized"
     return _client
+
+
+def set_llm(client: genai.Client) -> None:
+    global _client
+    _client = client

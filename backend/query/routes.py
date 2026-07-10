@@ -24,7 +24,7 @@ class QueryResponse(BaseModel):
 
 
 """
-
+results.points
 points=[
     ScoredPoint(
         id='uuid5(documet :idx)', 

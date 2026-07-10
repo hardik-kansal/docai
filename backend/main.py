@@ -9,6 +9,7 @@ from .query.routes import router as query_router
 from contextlib import asynccontextmanager
 from .config import settings
 from .logging_config import RouteMiddleware
+from google import genai
 import redis.asyncio as redis  # if just do import redis-> sync lib, fails at runtime
 from .auth.dependencies import (
     set_redis_pool,
@@ -25,7 +26,7 @@ from .ingestion.dependencies import (
     set_vectorPool,
     get_vectorPool,
 )
-from .query.dependencies import set_reranker
+from .query.dependencies import set_reranker, set_llm
 import asyncpg
 import logging
 import time
@@ -131,6 +132,11 @@ def reranker_start():
     set_reranker(reranker)
 
 
+def llm_start():
+    client = genai.Client(api_key=settings().GEMINI_KEY)
+    set_llm(client)
+
+
 async def vector_db_start():
     vectorPool = AsyncQdrantClient(url=settings().QDRANT_URL, check_compatibility=False)
     name = settings().COLLECTION
@@ -177,6 +183,7 @@ async def lifespan(app: FastAPI):
     s3_start()
     embed_model()
     reranker_start()
+    llm_start()
 
     # before startup
     yield

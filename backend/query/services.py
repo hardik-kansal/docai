@@ -12,6 +12,7 @@ import asyncio
 from starlette.concurrency import run_in_threadpool
 import logging
 from ..models.llm_ouput import GroundedAnswer, AbstainReason, AbstainOutput, Citation
+from ..guardrail.llmGuard import classify
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,7 @@ async def rerank_results(
     top_n: int = 10,
     budget_ms: int = 250,
 ) -> list[tuple[float, ScoredPoint]]:
-    docs = [point.payload["text"][:1000] for point in points]
+    docs = [point.payload.get("text", "")[:1000] for point in points]
     # req truncation till model max tokens(query + top chunks)
     # tokenizer inside already trucates but better to do manually
     try:
@@ -100,11 +101,7 @@ async def rerank_results(
 
 
 async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
-    results = await hybrid_search(
-        query_text=query_text,
-        user=user,
-    )
-    if results is None:
+    if await query_unsafe(query_text):
         return GroundedAnswer(
             answer=AbstainOutput.INPUT_REJECTED,
             citations=[],
@@ -112,12 +109,25 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
             abstained=True,
             abstain_reason=AbstainReason.INPUT_REJECTED,
         )
+    results = await hybrid_search(
+        query_text=query_text,
+        user=user,
+    )
+    if results is None:
+        return GroundedAnswer(
+            answer=AbstainOutput.NO_RELEVANT_CONTEXT,
+            citations=[],
+            confidence=0.0,
+            abstained=True,
+            abstain_reason=AbstainReason.NO_RELEVANT_CONTEXT,
+        )
     # cross encoder
     reranked = await rerank_results(
         query=query_text,
         points=results.points,
         top_n=10,
     )
+
     context = [
         {
             "chunk_id": point.payload["chunk_index"],
@@ -125,6 +135,15 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
         }
         for _, point in reranked
     ]
+    for _, point in reranked:
+        if await query_unsafe(point.payload["contextualized_text"]):
+            return GroundedAnswer(
+                answer=AbstainOutput.INPUT_REJECTED,
+                citations=[],
+                confidence=0.0,
+                abstained=True,
+                abstain_reason=AbstainReason.INPUT_REJECTED,
+            )
     try:
         llmResponse = await call_llm(query_text, context)
     except CircuitBreakerError:
@@ -143,6 +162,17 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
         )
     if llmResponse.status == "completed":
         return GroundedAnswer.model_validate_json(llmResponse.output_text)
+    else:
+        return GroundedAnswer(
+            answer=AbstainOutput.GENERATION_UNAVAILABLE,
+            citations=[
+                Citation(chunk_id=str(c["chunk_id"]), quote=c["contextualized_text"])
+                for c in context
+            ],
+            confidence=0.0,
+            abstained=True,
+            abstain_reason=AbstainReason.GENERATION_UNAVAILABLE,
+        )
 
 
 @get_circuit_breaker()
@@ -178,6 +208,18 @@ async def call_llm(query_text: str, context: list[dict]) -> Interaction:
     except Exception:
         logger.exception("LLM generation failed")
         raise
+
+
+async def query_unsafe(query_txt: str, budget_ms: int = 150) -> bool:
+    try:
+        result = await asyncio.wait_for(
+            run_in_threadpool(classify, query_txt),
+            timeout=budget_ms / 1000,
+        )
+        return result["is_unsafe"]
+    except asyncio.TimeoutError:
+        logger.warning("query_unsafe timed out after %dms, treating as safe", budget_ms)
+        return False
 
 
 # # Server-side state (recommended)

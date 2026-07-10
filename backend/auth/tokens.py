@@ -57,9 +57,8 @@ def _decode_token(raw_token: str, expected_type: str) -> TokenPayload:
         sub=data["sub"],
         scopes=[AccessScope(s) for s in data.get("scopes", [])],
         # .get(value to search, default)
-        # imp but not here some external auth providers when issue token
-        # leaves those fields in payloads which are empty so there if
-        # i write my another decoder without .get it would fail-> defensive engineering
+        # instead of error wither silently return or raise manual error
+        # -> defensive engineering
         exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
         jti=data["jti"],
         type=data["type"],
