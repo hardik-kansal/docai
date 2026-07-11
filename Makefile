@@ -39,7 +39,7 @@ start:
 	uv run fastapi dev backend/main.py
 
 upload:
-	 uv run python tests/test_script_for_s3.py
+	 uv run python tests/upload_s3.py
 
 
 

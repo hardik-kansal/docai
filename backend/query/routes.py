@@ -1,10 +1,9 @@
-from ..models.llm_ouput import GroundedAnswer
 import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
-
+from fastapi.responses import StreamingResponse
 from ..auth.dependencies import get_current_user, User
 from .services import ans_query
 
@@ -51,5 +50,7 @@ points=[
 async def query(
     payload: QueryRequest,
     user: Annotated[User, Depends(get_current_user)],
-) -> GroundedAnswer:
-    return await ans_query(payload.query, user)
+) -> StreamingResponse:
+    return StreamingResponse(
+        ans_query(payload.query, user), media_type="texxt/event-stream"
+    )

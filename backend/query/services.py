@@ -1,18 +1,18 @@
 from aiobreaker import CircuitBreakerError
-from google.genai._gaos.types.interactions.interaction import Interaction
 from fastembed import SparseTextEmbedding
 from qdrant_client import models
 from qdrant_client.models import ScoredPoint
 from ..ingestion.dependencies import get_embedModel, get_vectorPool
 from ..config import settings
 from ..auth.dependencies import User
-from .dependencies import get_reranker, get_llm
+from .dependencies import get_reranker, get_llm, GroundedJsonException
 from ..dependencies import call_with_retry, get_circuit_breaker
 import asyncio
 from starlette.concurrency import run_in_threadpool
 import logging
 from ..models.llm_ouput import GroundedAnswer, AbstainReason, AbstainOutput, Citation
 from ..guardrail.llmGuard import classify
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -102,24 +102,20 @@ async def rerank_results(
 
 async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
     if await query_unsafe(query_text):
-        return GroundedAnswer(
-            answer=AbstainOutput.INPUT_REJECTED,
-            citations=[],
-            confidence=0.0,
-            abstained=True,
-            abstain_reason=AbstainReason.INPUT_REJECTED,
-        )
+        raise GroundedJsonException(grounded_answer=get_unsafe_response())
     results = await hybrid_search(
         query_text=query_text,
         user=user,
     )
     if results is None:
-        return GroundedAnswer(
-            answer=AbstainOutput.NO_RELEVANT_CONTEXT,
-            citations=[],
-            confidence=0.0,
-            abstained=True,
-            abstain_reason=AbstainReason.NO_RELEVANT_CONTEXT,
+        raise GroundedJsonException(
+            grounded_answer=GroundedAnswer(
+                answer=AbstainOutput.NO_RELEVANT_CONTEXT,
+                citations=[],
+                confidence=0.0,
+                abstained=True,
+                abstain_reason=AbstainReason.NO_RELEVANT_CONTEXT,
+            )
         )
     # cross encoder
     reranked = await rerank_results(
@@ -137,12 +133,14 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
     ]
     for _, point in reranked:
         if await query_unsafe(point.payload["contextualized_text"]):
-            return GroundedAnswer(
-                answer=AbstainOutput.INPUT_REJECTED,
-                citations=[],
-                confidence=0.0,
-                abstained=True,
-                abstain_reason=AbstainReason.INPUT_REJECTED,
+            raise GroundedJsonException(
+                GroundedAnswer(
+                    answer=AbstainOutput.INPUT_REJECTED,
+                    citations=[],
+                    confidence=0.0,
+                    abstained=True,
+                    abstain_reason=AbstainReason.INPUT_REJECTED,
+                )
             )
     try:
         llmResponse = await call_llm(query_text, context)
@@ -150,33 +148,58 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
         logger.warning("gemini circuit breaker opened")
         llmResponse = None
     if llmResponse is None:
-        return GroundedAnswer(
-            answer=AbstainOutput.GENERATION_UNAVAILABLE,
-            citations=[
-                Citation(chunk_id=str(c["chunk_id"]), quote=c["contextualized_text"])
-                for c in context
-            ],
-            confidence=0.0,
-            abstained=True,
-            abstain_reason=AbstainReason.GENERATION_UNAVAILABLE,
-        )
-    if llmResponse.status == "completed":
-        return GroundedAnswer.model_validate_json(llmResponse.output_text)
-    else:
-        return GroundedAnswer(
-            answer=AbstainOutput.GENERATION_UNAVAILABLE,
-            citations=[
-                Citation(chunk_id=str(c["chunk_id"]), quote=c["contextualized_text"])
-                for c in context
-            ],
-            confidence=0.0,
-            abstained=True,
-            abstain_reason=AbstainReason.GENERATION_UNAVAILABLE,
+        raise GroundedJsonException(
+            GroundedAnswer(
+                answer=AbstainOutput.GENERATION_UNAVAILABLE,
+                citations=[
+                    Citation(
+                        chunk_id=str(c["chunk_id"]), quote=c["contextualized_text"]
+                    )
+                    for c in context
+                ],
+                confidence=0.0,
+                abstained=True,
+                abstain_reason=AbstainReason.GENERATION_UNAVAILABLE,
+            )
         )
 
+    accumulated_thoughts = ""
+    accumulated_json_tokens = ""
 
+    try:
+        for event in llmResponse:
+            if event.event_type == "step.delta":
+                if event.delta.type == "thought_summary":
+                    text_chunk = event.delta.content.text
+                    accumulated_thoughts += text_chunk
+                    yield f"data: {json.dumps({'type': 'thought', 'content': text_chunk})}\n\n"
+
+                elif event.delta.type == "text" and event.delta.text:
+                    text_chunk = event.delta.text
+                    accumulated_json_tokens += text_chunk
+                    yield f"data: {json.dumps({'type': 'structured_json_delta', 'content': text_chunk})}\n\n"
+
+        # if accumulated_json_tokens:
+        #     try:
+        #         parsed_response = json.loads(accumulated_json_tokens)
+        #         hhem_score = await HHEMValidator.evaluate_factual_consistency(
+        #             source_text=source_documents_text,
+        #             generated_text=parsed_response.get("answer", "")
+        #         )
+        #         yield f"data: {json.dumps({'type': 'hhem_verification', 'score': hhem_score, 'status': 'passed' if hhem_score >= 0.5 else 'failed'})}\n\n"
+        #     except json.JSONDecodeError:
+        #         logger.error("Failed downstream parsing step for streaming string compilation.")
+
+    except Exception:
+        logger.exception(
+            "Active execution failure intercepted during live session stream."
+        )
+        yield f"data: {json.dumps({'type': 'error', 'content': 'Upstream link severed mid-session.'})}\n\n"
+
+
+# opens circuit breaker if 5 diff req returns error here
 @get_circuit_breaker()
-async def call_llm(query_text: str, context: list[dict]) -> Interaction:
+async def call_llm(query_text: str, context: list[dict]):
     ctx_block = "\n\n".join(
         f"""Chunk ID: {c["chunk_id"]}
     Chunk Contextualized Text:
@@ -194,7 +217,7 @@ async def call_llm(query_text: str, context: list[dict]) -> Interaction:
     # store chats-> response and request for later retrieval.
     try:
         # have default timeout, retry logic api side
-        interaction = get_llm().interactions.create(
+        stream = get_llm().interactions.create(
             model=settings().GEMINI_MODEL,
             input=input_text,
             system_instruction=settings().system_prompt,
@@ -203,14 +226,26 @@ async def call_llm(query_text: str, context: list[dict]) -> Interaction:
                 "mime_type": "application/json",
                 "schema": GroundedAnswer.model_json_schema(),
             },
+            generation_config={"thinking_summaries": "auto", "thinking_level": "high"},
+            stream=True,
         )
-        return interaction
+        return stream
     except Exception:
         logger.exception("LLM generation failed")
         raise
 
 
-async def query_unsafe(query_txt: str, budget_ms: int = 150) -> bool:
+def get_unsafe_response() -> GroundedAnswer:
+    return GroundedAnswer(
+        answer=AbstainOutput.INPUT_REJECTED,
+        citations=[],
+        confidence=0.0,
+        abstained=True,
+        abstain_reason=AbstainReason.INPUT_REJECTED,
+    )
+
+
+async def query_unsafe(query_txt: str, budget_ms: int = 1000) -> bool:
     try:
         result = await asyncio.wait_for(
             run_in_threadpool(classify, query_txt),
@@ -218,8 +253,10 @@ async def query_unsafe(query_txt: str, budget_ms: int = 150) -> bool:
         )
         return result["is_unsafe"]
     except asyncio.TimeoutError:
-        logger.warning("query_unsafe timed out after %dms, treating as safe", budget_ms)
-        return False
+        logger.warning(
+            "query_unsafe timed out after %dms, treating as unsafe", budget_ms
+        )
+        return True
 
 
 # # Server-side state (recommended)

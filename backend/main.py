@@ -1,7 +1,8 @@
+from fastapi.responses import JSONResponse
 from qdrant_client import AsyncQdrantClient, models
 from fastembed import TextEmbedding
 from fastembed.rerank.cross_encoder import TextCrossEncoder
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
 from typing import Annotated
 from .auth.routes import router as auth_router
 from .ingestion.routes import router as s3_router
@@ -9,6 +10,7 @@ from .query.routes import router as query_router
 from contextlib import asynccontextmanager
 from .config import settings
 from .logging_config import RouteMiddleware
+from .query.dependencies import GroundedJsonException
 from google import genai
 import redis.asyncio as redis  # if just do import redis-> sync lib, fails at runtime
 from .auth.dependencies import (
@@ -200,6 +202,11 @@ app.include_router(auth_router)
 app.include_router(s3_router)
 app.include_router(query_router)
 app.add_middleware(RouteMiddleware)
+
+
+@app.exception_handler(GroundedJsonException)
+async def guardrail_exception_handler(request: Request, exc: GroundedJsonException):
+    return JSONResponse(status_code=exc.status_code, content=exc.grounded_answer)
 
 
 @app.get("/")
