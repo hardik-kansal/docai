@@ -4,12 +4,14 @@ import json
 from fastapi import APIRouter, Depends, Request
 from urllib.parse import unquote
 from ..config import settings
-from ..models.document import PresignedURLResponse
+from ..models.document import PresignedURLResponse, DocumentResponse
 
 from typing import Annotated
 from .storage import generate_presigned_put_url
 from .tasks import process_document_task
 from ..auth.dependencies import get_current_user, User, get_auth_service, AuthService
+from .dependencies import get_DocService
+from .services import DocService
 import uuid
 
 
@@ -17,6 +19,26 @@ logger = logging.getLogger(__name__)
 settings = settings()
 
 router = APIRouter(prefix="/ingestion")
+
+
+@router.get("/documents")
+async def list_documents(
+    user: Annotated[User, Depends(get_current_user)],
+    doc_service: Annotated[DocService, Depends(get_DocService)],
+) -> list[DocumentResponse]:
+    rows = await doc_service.list_documents(user.user_id)
+    return [
+        DocumentResponse(
+            id=str(row.id),
+            filename=row.filename,
+            status=row.status,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+            s3_key=row.s3_key,
+            error=row.error,
+        )
+        for row in rows
+    ]
 
 
 @router.get("/get-upload-url")

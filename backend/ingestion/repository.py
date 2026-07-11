@@ -3,6 +3,7 @@ import datetime
 import asyncpg
 import uuid
 from dataclasses import dataclass
+from ..models.document import DocumentRow
 
 
 @dataclass(slots=True)
@@ -150,6 +151,29 @@ class DocRepository:
             content_hash,
         )
         return bool(result)
+
+    async def list_documents(self, user_id: uuid.UUID) -> list[DocumentRow]:
+        rows = await self._pool.fetch(
+            """
+            SELECT id, filename, status, created_at, updated_at, s3_key, error
+            FROM documents
+            WHERE user_id = $1
+            ORDER BY created_at DESC;
+            """,
+            user_id,
+        )
+        return [
+            DocumentRow(
+                id=row["id"],
+                filename=row["filename"],
+                status=row["status"],
+                created_at=row["created_at"],
+                updated_at=row["updated_at"],
+                s3_key=row["s3_key"],
+                error=row["error"],
+            )
+            for row in rows
+        ]
 
 
 """

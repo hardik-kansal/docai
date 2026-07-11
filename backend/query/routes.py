@@ -52,5 +52,5 @@ async def query(
     user: Annotated[User, Depends(get_current_user)],
 ) -> StreamingResponse:
     return StreamingResponse(
-        ans_query(payload.query, user), media_type="texxt/event-stream"
+        ans_query(payload.query, user), media_type="text/event-stream"
     )

@@ -1,6 +1,7 @@
 from docling_core.transforms.chunker import BaseChunk, HybridChunker
 import uuid
 from .repository import DocRepository, Chunk
+from ..models.document import DocumentRow
 import hashlib
 from dataclasses import astuple
 import logging
@@ -76,3 +77,6 @@ class DocService:
             user_id=uuid.UUID(user_id),
             content_hash=content_hash,
         )
+
+    async def list_documents(self, user_id: str) -> list[DocumentRow]:
+        return await self._repo.list_documents(uuid.UUID(user_id))

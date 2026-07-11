@@ -6,7 +6,8 @@ from . import tokens
 from fastapi import HTTPException, APIRouter, Response, Request, Depends
 from pydantic import BaseModel, Field
 from .services import AuthService
-from .dependencies import get_auth_service
+from .dependencies import get_auth_service, get_current_user, User
+
 import logging
 from typing import Annotated
 from jwt import ExpiredSignatureError
@@ -19,7 +20,30 @@ class LoginRequest(BaseModel):
     pwd: str = Field(default=..., max_length=10, min_length=1)
 
 
+class UserProfileResponse(BaseModel):
+    user_id: str
+    username: str
+    scopes: list[str]
+    plan_type: str
+    storage_used_bytes: int
+
+
 router = APIRouter(prefix="/api/v1/auth")
+
+
+@router.get("/me")
+async def me(
+    user: Annotated[User, Depends(get_current_user)],
+    authService: Annotated[AuthService, Depends(get_auth_service)],
+) -> UserProfileResponse:
+    user_row = await authService.get_by_user_id(user.user_id)
+    return UserProfileResponse(
+        user_id=user_row.user_id,
+        username=user_row.username,
+        scopes=[s.value for s in user_row.scopes],
+        plan_type=user_row.plan_type,
+        storage_used_bytes=user_row.storage_used_bytes,
+    )
 
 
 @router.post("/signup")
