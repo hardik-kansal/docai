@@ -168,7 +168,9 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
 
     try:
         for event in llmResponse:
-            if event.event_type == "step.delta":
+            if event.event_type == "interaction.created":
+                yield f"data: {json.dumps({'type': 'started'}, default=str)}\n\n"
+            elif event.event_type == "step.delta":
                 if event.delta.type == "thought_summary":
                     text_chunk = event.delta.content.text
                     accumulated_thoughts += text_chunk
@@ -177,7 +179,9 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
                 elif event.delta.type == "text" and event.delta.text:
                     text_chunk = event.delta.text
                     accumulated_json_tokens += text_chunk
-                    yield f"data: {json.dumps({'type': 'structured_json_delta', 'content': text_chunk})}\n\n"
+                    yield f"data: {json.dumps({'type': 'structured_json_data', 'content': text_chunk})}\n\n"
+            elif event.event_type == "interaction.completed":
+                yield f"data: {json.dumps({'type': 'usage', 'content': event.interaction.usage}, default=str)}\n\n"
 
         # if accumulated_json_tokens:
         #     try:
@@ -347,4 +351,34 @@ output_audio=None
 output_video=None
 object='interaction'
 
+"""
+
+
+"""
+event.interaction object
+InteractionSseEventInteraction(
+    id='v1_...', 
+    status='completed', 
+    object='interaction', 
+    model='gemini-3.1-flash-lite', 
+    agent=None, 
+    created='2026-07-11T14:30:32Z', 
+    updated='2026-07-11T14:30:32Z', 
+    service_tier='standard', 
+    usage=Usage(
+        total_input_tokens=1250, 
+        input_tokens_by_modality=
+        [ModalityTokens(modality='text', tokens=1250)], 
+        total_cached_tokens=0, 
+        cached_tokens_by_modality=None, 
+        total_output_tokens=152, 
+        output_tokens_by_modality=None, 
+        total_tool_use_tokens=0, 
+        tool_use_tokens_by_modality=None, 
+        total_thought_tokens=867, 
+        total_tokens=2269, 
+        grounding_tool_count=None), steps=None) 
+    event_type='interaction.completed' 
+    event_id=None 
+    metadata=None
 """
