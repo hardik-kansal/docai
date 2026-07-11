@@ -1,4 +1,7 @@
-example output format
+
+example output format of query/
+
+{"type": "started"}
 
 data: {"type": "thought", "content": "**Considering Label Smoothing**\n\nI'm currently focused on dissecting the user's interest in \"label smoothing.\" My initial analysis hinges on the explicit mention of employing label smoothing with a value of epsilon. I'm aiming to ascertain the full context and what they specifically require related to it.\n\n\n"}
 
@@ -15,3 +18,12 @@ data: {"type": "structured_json_delta", "content": " unsure, but improves accura
 data: {"type": "structured_json_delta", "content": "0,\n  \"abstained\": false,\n  \"abstain_reason\": \"none\"\n}"}
 
 data: {"type": "usage", "content": "total_input_tokens=1250 input_tokens_by_modality=[ModalityTokens(modality='text', tokens=1250)] total_cached_tokens=0 cached_tokens_by_modality=None total_output_tokens=160 output_tokens_by_modality=None total_tool_use_tokens=0 tool_use_tokens_by_modality=None total_thought_tokens=465 total_tokens=1875 grounding_tool_count=None"}
+
+
+
+fetures to have
+login/signup/logout
+chat interface, document upload , send button stops working only when documnt is being uploaded, and parsed both, document side bar showing document uploaded with details, if clicked open document, document type can only be pdf
+ans can be either json object or 
+ans would be streamed, show lighter thinking part, actual ans normal, with citations when recieved in side bar with confidence ui,
+with a toolbar to show how much this query took tokens (input,output, though, total)

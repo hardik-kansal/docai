@@ -34,7 +34,9 @@ def validate_mime_type(raw_bytes: bytes, object_key):
     logger.info("MIME validated: %s key=%s", detected, object_key)
 
 
-def generate_presigned_put_url(object_key: str, max_bytes: int) -> PresignedURLResponse:
+def generate_presigned_post_url(
+    object_key: str, max_bytes: int
+) -> PresignedURLResponse:
     presigned_url = get_boto3_client().generate_presigned_post(
         Bucket=settings.minio_bucket,
         Key=object_key,
@@ -66,6 +68,30 @@ def generate_presigned_put_url(object_key: str, max_bytes: int) -> PresignedURLR
         upload_url=json.dumps(presigned_url),
         object_key=object_key,
         expires_in=settings.presigned_url_expiry_seconds,
+    )
+
+
+VIEW_URL_EXPIRY_SECONDS = 15 * 60  # 15 minutes
+
+
+def generate_presigned_get_url(object_key: str) -> str:
+    """Return a time-limited GET URL for a private S3/MinIO object.
+
+    Unlike generate_presigned_post_url (which returns a url + fields dict for
+    multipart form upload), generate_presigned_url("get_object") returns a
+    single plain URL the browser can open directly — no form, no extra headers.
+    Response-Content-Disposition tells the browser to display inline (PDF viewer)
+    rather than force-download.
+    """
+    return get_boto3_client().generate_presigned_url(
+        "get_object",
+        Params={
+            "Bucket": settings.minio_bucket,
+            "Key": object_key,
+            "ResponseContentType": "application/pdf",
+            "ResponseContentDisposition": "inline",
+        },
+        ExpiresIn=VIEW_URL_EXPIRY_SECONDS,
     )
 
 

@@ -6,6 +6,7 @@ import hashlib
 from dataclasses import astuple
 import logging
 
+
 NAMESPACE = uuid.UUID("6f2a9e1e-2b3a-4c8b-9e3a-7a6f1c9d5e10")
 BATCH_SIZE = 10
 logger = logging.getLogger(__name__)
@@ -80,3 +81,6 @@ class DocService:
 
     async def list_documents(self, user_id: str) -> list[DocumentRow]:
         return await self._repo.list_documents(uuid.UUID(user_id))
+
+    async def get_s3_key(self, document_id: str, user_id: str) -> str | None:
+        return await self._repo.get_s3_key(uuid.UUID(document_id), uuid.UUID(user_id))

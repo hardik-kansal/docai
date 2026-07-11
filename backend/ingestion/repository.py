@@ -175,8 +175,22 @@ class DocRepository:
             for row in rows
         ]
 
+    async def get_s3_key(
+        self, document_id: uuid.UUID, user_id: uuid.UUID
+    ) -> str | None:
+        """Fetch s3_key for a document owned by user_id. Returns None if not found or not owned."""
+        return await self._pool.fetchval(
+            """
+            SELECT s3_key FROM documents
+            WHERE id = $1 AND user_id = $2;
+            """,
+            document_id,
+            user_id,
+        )
+
 
 """
+
 for inserting into pg, there are multiple ways
 1. single insert, slowest
 2. multi row insert, fast for batch, performance depends machine to machine bz of batch size

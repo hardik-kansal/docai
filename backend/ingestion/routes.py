@@ -7,7 +7,7 @@ from ..config import settings
 from ..models.document import PresignedURLResponse, DocumentResponse
 
 from typing import Annotated
-from .storage import generate_presigned_put_url
+from .storage import generate_presigned_post_url, generate_presigned_get_url
 from .tasks import process_document_task
 from ..auth.dependencies import get_current_user, User, get_auth_service, AuthService
 from .dependencies import get_DocService
@@ -41,6 +41,25 @@ async def list_documents(
     ]
 
 
+@router.get("/documents/{document_id}/view-url")
+async def get_view_url(
+    document_id: str,
+    user: Annotated[User, Depends(get_current_user)],
+    doc_service: Annotated[DocService, Depends(get_DocService)],
+):
+    """Return a 15-minute presigned GET URL for the PDF.
+    Ownership enforced in the DB query — wrong user gets 404, not 403,
+    to avoid leaking whether a document_id exists at all.
+    """
+    from fastapi import HTTPException
+
+    s3_key = await doc_service.get_s3_key(document_id, user.user_id)
+    if s3_key is None:
+        raise HTTPException(status_code=404, detail="document not found")
+    url = generate_presigned_get_url(s3_key)
+    return {"view_url": url, "expires_in": 900}
+
+
 @router.get("/get-upload-url")
 async def get_upload_url(
     filename: str,
@@ -53,7 +72,7 @@ async def get_upload_url(
     userRow = await authService.get_by_user_id(user.user_id)
     plan_type = userRow.plan_type
     storage_used_bytes = userRow.storage_used_bytes
-    return generate_presigned_put_url(
+    return generate_presigned_post_url(
         object_key=object_key,
         max_bytes=PLANS[PlanType(plan_type)].max_storage_bytes - storage_used_bytes,
     )
