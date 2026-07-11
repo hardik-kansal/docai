@@ -15,6 +15,10 @@ class QueryRequest(BaseModel):
     query: str = Field(
         ..., min_length=1, max_length=2048, description="Natural-language question"
     )
+    document_ids: list[str] | None = Field(
+        default=None,
+        description="Scope retrieval to these document IDs. Omit to search all user docs.",
+    )
 
 
 class QueryResponse(BaseModel):
@@ -52,5 +56,6 @@ async def query(
     user: Annotated[User, Depends(get_current_user)],
 ) -> StreamingResponse:
     return StreamingResponse(
-        ans_query(payload.query, user), media_type="text/event-stream"
+        ans_query(payload.query, user, payload.document_ids),
+        media_type="text/event-stream",
     )

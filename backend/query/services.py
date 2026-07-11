@@ -100,12 +100,15 @@ async def rerank_results(
     return [(score, point) for point, score in ranked[:top_n]]
 
 
-async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
+async def ans_query(
+    query_text: str, user: User, document_ids: list[str] | None = None
+) -> GroundedAnswer | None:
     if await query_unsafe(query_text):
         raise GroundedJsonException(grounded_answer=get_unsafe_response())
     results = await hybrid_search(
         query_text=query_text,
         user=user,
+        document_ids=document_ids,
     )
     if results is None:
         raise GroundedJsonException(
@@ -181,7 +184,20 @@ async def ans_query(query_text: str, user: User) -> GroundedAnswer | None:
                     accumulated_json_tokens += text_chunk
                     yield f"data: {json.dumps({'type': 'structured_json_data', 'content': text_chunk})}\n\n"
             elif event.event_type == "interaction.completed":
-                yield f"data: {json.dumps({'type': 'usage', 'content': event.interaction.usage}, default=str)}\n\n"
+                usage = event.interaction.usage
+                yield f"data: {
+                    json.dumps(
+                        {
+                            'type': 'usage',
+                            'content': {
+                                'input_tokens': usage.total_input_tokens,
+                                'output_tokens': usage.total_output_tokens,
+                                'thought_tokens': usage.total_thought_tokens,
+                                'total_tokens': usage.total_tokens,
+                            },
+                        }
+                    )
+                }\n\n"
 
         # if accumulated_json_tokens:
         #     try:

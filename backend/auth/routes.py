@@ -26,6 +26,7 @@ class UserProfileResponse(BaseModel):
     scopes: list[str]
     plan_type: str
     storage_used_bytes: int
+    created_at: str
 
 
 router = APIRouter(prefix="/api/v1/auth")
@@ -43,6 +44,7 @@ async def me(
         scopes=[s.value for s in user_row.scopes],
         plan_type=user_row.plan_type,
         storage_used_bytes=user_row.storage_used_bytes,
+        created_at=user_row.created_at.isoformat(),
     )
 
 

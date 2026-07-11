@@ -30,7 +30,7 @@ def upgrade() -> None:
         filename        TEXT NOT NULL,
         content_hash    TEXT NOT NULL,           -- sha256 of uploaded bytes, dedupes re-uploads
         status          TEXT NOT NULL DEFAULT 'uploaded',
-                        -- uploaded -> parsing -> chunked -> embedding -> indexed -> ready | failed
+                        
         docling_doc_uri TEXT,                    -- s3 path to exported DoclingDocument JSON
         embedding_model TEXT,                    -- pinned per document, not global
         embedding_dim   INT,
