@@ -35,7 +35,9 @@ import time
 import boto3
 from botocore.config import Config
 import contextlib
+import logfire
 
+logfire.configure(token=settings().LOGFIRE_TOKEN)
 logger = logging.getLogger(__name__)
 
 
@@ -202,6 +204,11 @@ app.include_router(auth_router)
 app.include_router(s3_router)
 app.include_router(query_router)
 app.add_middleware(RouteMiddleware)
+logfire.instrument_fastapi(app)
+logfire.instrument_httpx()
+logfire.instrument_asyncpg()
+logfire.instrument_celery()
+logfire.instrument_redis()
 
 
 @app.exception_handler(GroundedJsonException)

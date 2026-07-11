@@ -106,7 +106,6 @@ semantic cache, query router (route trivial queries to a cheap model), per-query
 
 -> Citation enforcement with self-verification; abstention/escalation on low confidence; 
 -> Ragas faithfulness + answer-relevance + context-relevance 
--> LLM-as-judge for answer quality with identity-bias mitigation (use a different model family as judge than as generator); 
 -> eval gate regression gate fails CI if faithfulness regresses.
 
 

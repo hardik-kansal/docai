@@ -8,6 +8,7 @@ import time
 from datetime import datetime, timezone
 import contextvars
 from .config import settings
+import logfire
 
 # this is handled for each unique req using set/get
 request_id_ctx = contextvars.ContextVar("X-Request-ID", default=None)
@@ -57,7 +58,7 @@ logger = logging.getLogger("backend")
 logger.addFilter(ContextFilter())
 stdout_handler = logging.StreamHandler(sys.stdout)
 stdout_handler.setFormatter(JsonFormatter())
-logger.addHandler(stdout_handler)
+logger.addHandler(logfire.LogfireLoggingHandler())  # use stream_handler in prod
 logger.propagate = False
 logger.setLevel(logging.INFO if settings().is_prod else logging.DEBUG)
 # this line if not used, inherits from parents

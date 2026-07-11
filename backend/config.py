@@ -39,6 +39,8 @@ class Settings(BaseSettings):
 
     system_prompt: str
 
+    LOGFIRE_TOKEN: str
+
 
 @lru_cache(maxsize=1)
 def settings() -> Settings:
