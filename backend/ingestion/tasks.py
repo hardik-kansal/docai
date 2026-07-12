@@ -198,6 +198,7 @@ def process_document_task(
         asyncio.get_event_loop().run_until_complete(persist_document_data())
 
     finally:
+        logger.error("could not parsed")
         os.unlink(local_path)
 
 

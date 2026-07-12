@@ -172,7 +172,7 @@ function DocumentPanel({
               style={{
                 fontSize: "0.68rem", 
                 background: "transparent", 
-                border: "1px solid var(--border-default)", 
+                border: "none", 
                 borderRadius: "4px", 
                 color: "var(--text-secondary)", 
                 padding: "2px 6px",
@@ -201,6 +201,7 @@ function DocumentPanel({
                 <div
                   key={doc.id}
                   id={`doc-item-${doc.id}`}
+                  className={`doc-list-item ${isReady ? "ready-doc" : ""}`}
                   onClick={() => isReady && onToggleDoc(doc.id)}
                   style={{
                     display: "flex",
@@ -208,8 +209,8 @@ function DocumentPanel({
                     gap: 8,
                     padding: "8px 10px",
                     borderRadius: "var(--radius-md)",
-                    background: isSelected ? "var(--rose-50)" : "var(--bg-elevated)",
-                    border: `1px solid ${isSelected ? "var(--rose-300)" : "var(--border-subtle)"}`,
+                    background: "var(--bg-elevated)",
+                    border: "1px solid var(--border-subtle)",
                     cursor: isReady ? "pointer" : "default",
                     transition: "all var(--transition-fast)",
                     opacity: isReady ? 1 : 0.7,
@@ -223,8 +224,8 @@ function DocumentPanel({
                         height: 16,
                         marginTop: 1,
                         borderRadius: "50%",
-                        border: `2px solid ${isSelected ? "var(--rose-500)" : "var(--border-default)"}`,
-                        background: isSelected ? "var(--rose-500)" : "transparent",
+                        border: isSelected ? "none" : "1px solid var(--border-default)",
+                        background: "transparent",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
@@ -232,7 +233,7 @@ function DocumentPanel({
                         transition: "all var(--transition-fast)",
                       }}
                     >
-                      {isSelected && <span style={{ color: "#fff", fontSize: "0.55rem", fontWeight: 700 }}>✓</span>}
+                      {isSelected && <span style={{ color: "var(--status-ready)", fontSize: "0.85rem", fontWeight: 700 }}>✓</span>}
                     </div>
                   )}
 
@@ -267,14 +268,35 @@ function DocumentPanel({
 
 // ─── Chat answer components ───────────────────────────────────────────────────
 
-function ThinkingIndicator({ text }: { text: string }) {
+function ThoughtDropdown({ text, isThinking }: { text: string; isThinking: boolean }) {
+  const [isOpen, setIsOpen] = useState(isThinking);
+
+  useEffect(() => {
+    if (isThinking) setIsOpen(true);
+  }, [isThinking]);
+
+  if (!text && !isThinking) return null;
+
   return (
-    <div className="thinking-panel">
-      <div className="thinking-header">
-        <div className="thinking-dots"><span /><span /><span /></div>
-        Thinking
+    <div className="thinking-panel" style={{ marginBottom: "12px" }}>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: "6px" }}
+      >
+        {isThinking ? (
+          <div className="thinking-dots"><span /><span /><span /></div>
+        ) : (
+          <span style={{ fontSize: "0.7rem", transition: "transform 0.2s", transform: isOpen ? "rotate(90deg)" : "rotate(0deg)", color: "var(--text-muted)" }}>▶</span>
+        )}
+        <span style={{ fontSize: "0.9rem", fontWeight: 600, color: "var(--text-muted)" }}>
+          {isThinking ? "Thinking..." : "View thought process"}
+        </span>
       </div>
-      {text && <div style={{ fontStyle: "italic", whiteSpace: "pre-wrap", color: "var(--rose-700)", opacity: 0.8 }}>{text}</div>}
+      {isOpen && text && (
+        <div style={{ marginTop: "8px", marginLeft: "4px", paddingLeft: "14px", borderLeft: "3px solid var(--border-subtle)", fontSize: "0.9rem", fontStyle: "italic", whiteSpace: "pre-wrap", color: "var(--text-muted)", maxHeight: "600px", overflowY: "auto", lineHeight: "1.6" }}>
+          {text}
+        </div>
+      )}
     </div>
   );
 }
@@ -361,7 +383,7 @@ function AssistantMessage({ msg }: { msg: ChatMessage }) {
       <div className="message-avatar">🤖</div>
       <div className="message-content" style={{ maxWidth: "95%", flexDirection: "row", gap: "20px" }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "7px", minWidth: 0 }}>
-          {msg.isThinking && !msg.groundedAnswer && <ThinkingIndicator text={msg.thoughts ?? ""} />}
+          {(msg.isThinking || msg.thoughts) && <ThoughtDropdown text={msg.thoughts ?? ""} isThinking={msg.isThinking} />}
           {(msg.content || msg.groundedAnswer) && (
             <div className={`message-text${msg.isStreaming && !msg.groundedAnswer ? " streaming-cursor" : ""}`}>
               <ReactMarkdown>

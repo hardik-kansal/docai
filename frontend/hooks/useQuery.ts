@@ -82,7 +82,7 @@ export function useQuery() {
                     ? {
                         ...m,
                         isThinking: false,
-                        content: (m.content ?? "") + chunk,
+                        content: chunk,
                       }
                     : m
                 )

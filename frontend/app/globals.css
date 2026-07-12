@@ -1533,3 +1533,8 @@ a:hover {
 .ubuntu-sidebar:has(.ubuntu-folder-drop-zone:hover) .ubuntu-folder-tab::after {
   background: #f05a28 !important;
 }
+
+/* Document list item hover state */
+.doc-list-item.ready-doc:hover {
+  background-color: var(--bg-surface) !important;
+}

@@ -72,10 +72,20 @@ export async function parseStream(
               callbacks.onThought?.(event.content);
               break;
 
-            case "structured_json_data":
+            case "structured_json_data": {
               accumulatedJson += event.content;
-              callbacks.onJsonChunk?.(event.content);
+              const match = accumulatedJson.match(/"answer"\s*:\s*"((?:[^"\\]|\\.)*)/);
+              let partial = accumulatedJson;
+              if (match) {
+                try {
+                  partial = JSON.parse(`"${match[1]}"`);
+                } catch {
+                  partial = match[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+                }
+              }
+              callbacks.onJsonChunk?.(partial);
               break;
+            }
 
             case "usage":
               callbacks.onUsage?.(event.content);
