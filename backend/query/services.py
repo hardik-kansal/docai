@@ -94,23 +94,26 @@ async def rerank_results(
         )
     except asyncio.TimeoutError:
         # fall back to just topn rather than failing the request
+        logger.warning("reranking- fall back to just topn")
         return [(point.score, point) for point in points[:top_n]]
-
+    logger.info("reranking done")
     ranked = sorted(zip(points, scores), key=lambda x: x[1], reverse=True)
     return [(score, point) for point, score in ranked[:top_n]]
 
 
-async def ans_query(
+async def build_context(
     query_text: str, user: User, document_ids: list[str] | None = None
-) -> GroundedAnswer | None:
+) -> list[dict]:
     if await query_unsafe(query_text):
         raise GroundedJsonException(grounded_answer=get_unsafe_response())
+    logger.info("query safe")
     results = await hybrid_search(
         query_text=query_text,
         user=user,
         document_ids=document_ids,
     )
     if results is None:
+        logger.info("NO_RELEVANT_CONTEXT")
         raise GroundedJsonException(
             grounded_answer=GroundedAnswer(
                 answer=AbstainOutput.NO_RELEVANT_CONTEXT,
@@ -120,6 +123,8 @@ async def ans_query(
                 abstain_reason=AbstainReason.NO_RELEVANT_CONTEXT,
             )
         )
+    logger.info("Hybrid search completed")
+
     # cross encoder
     reranked = await rerank_results(
         query=query_text,
@@ -136,6 +141,9 @@ async def ans_query(
     ]
     for _, point in reranked:
         if await query_unsafe(point.payload["contextualized_text"]):
+            logger.info(
+                f"chunk is not safe: {point.payload["contextualized_text"][:100]}"
+            )
             raise GroundedJsonException(
                 GroundedAnswer(
                     answer=AbstainOutput.INPUT_REJECTED,
@@ -145,12 +153,15 @@ async def ans_query(
                     abstain_reason=AbstainReason.INPUT_REJECTED,
                 )
             )
+    logger.info("all chunks safe")
     try:
         llmResponse = await call_llm(query_text, context)
     except CircuitBreakerError:
         logger.warning("gemini circuit breaker opened")
         llmResponse = None
+
     if llmResponse is None:
+        logger.warning("couldnt connect to llm")
         raise GroundedJsonException(
             GroundedAnswer(
                 answer=AbstainOutput.GENERATION_UNAVAILABLE,
@@ -165,7 +176,10 @@ async def ans_query(
                 abstain_reason=AbstainReason.GENERATION_UNAVAILABLE,
             )
         )
+    return context, llmResponse
 
+
+async def ans_query(llmResponse):
     accumulated_thoughts = ""
     accumulated_json_tokens = ""
 

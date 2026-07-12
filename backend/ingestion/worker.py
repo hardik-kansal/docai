@@ -7,12 +7,12 @@ from .dependencies import (
     set_boto3_client,
     set_converter,
     set_chunker,
-    set_asyncpg_pool,
     asyncpg,
     init_pg_connection,
     set_vectorPool,
     set_embedModel,
 )
+from ..auth.dependencies import set_asyncpg_pool
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (

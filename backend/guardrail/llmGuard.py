@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _CLASSES = ["Benign", "Injection"]
-_THRESHOLD = 0.9
+_THRESHOLD = 0.5
 
 _tokenizer = Tokenizer.from_file(
     os.path.join(_HERE, "core/Llama-Prompt-Guard-2-22M-onnx", "tokenizer.json")
@@ -35,6 +35,13 @@ def classify(text: str) -> dict:
     idx = int(np.argmax(probs))
     label = _CLASSES[idx]
     confidence = float(probs[idx])
+    logger.info(
+        {
+            "label": label,
+            "confidence": confidence,
+            "is_unsafe": label == "Injection" or confidence < _THRESHOLD,
+        }
+    )
     return {
         "label": label,
         "confidence": confidence,

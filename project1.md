@@ -1,11 +1,3 @@
-# PROJECT 1: "Clause" — A Contract & Policy Intelligence System with Citations and a Confidence Budget
-
-## Problem statement.
-Teams (legal ops, procurement, compliance) need to ask natural-language questions across a corpus of contracts, policies, and regulations and get answers that are grounded, cited to the exact clause, and honest about uncertainty — because a confidently wrong answer about an indemnification clause is worse than no answer. Generic RAG demos return a paragraph and a vibe. This system returns an answer, the exact source clauses, a faithfulness score, and refuses (or escalates) when grounding is weak.
-
-## Why this isn't generic / why a startup HR won't neglect it.
-It's not "chat with a PDF." It's a domain where being wrong has consequences, so it forces you to build the production rigor that's actually the job: clause-level citations, an eval harness that measures faithfulness, PII/sensitive-data handling, access-control-aware retrieval, and explicit uncertainty communication. RAG is also the single most hireable pattern: the most effective project for immediate hiring is a Retrieval Augmented Generation System because it solves common business problems by grounding language models in specific enterprise data for accuracy. You're doing the hireable pattern with the rigor most candidates skip.
-
 ## Architecture overview.
 
 ```text

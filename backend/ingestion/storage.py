@@ -1,4 +1,3 @@
-import json
 import logging
 
 # from typing import Generator
@@ -65,7 +64,8 @@ def generate_presigned_post_url(
     logger.debug(presigned_url)
 
     return PresignedURLResponse(
-        upload_url=json.dumps(presigned_url),
+        upload_url=presigned_url["url"],  # actual MinIO POST endpoint
+        upload_fields=presigned_url["fields"],  # auth fields that must be in the form
         object_key=object_key,
         expires_in=settings.presigned_url_expiry_seconds,
     )

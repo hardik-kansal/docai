@@ -7,6 +7,7 @@ from boto3.s3.transfer import TransferConfig
 from .services import DocService
 from .repository import DocRepository
 import asyncpg
+from ..auth.dependencies import get_asyncpg_pool
 
 _s3_client = None
 
@@ -53,19 +54,6 @@ def get_chunker() -> HybridChunker:
 def set_chunker(chunker: HybridChunker):
     global _chunker
     _chunker = chunker
-
-
-_pool: asyncpg.Pool | None = None
-
-
-def set_asyncpg_pool(pool: asyncpg.Pool):
-    global _pool
-    _pool = pool
-
-
-def get_asyncpg_pool() -> asyncpg.Pool:
-    assert _pool is not None, "Postgres pool not initialized"
-    return _pool
 
 
 async def init_pg_connection(conn: asyncpg.Connection):

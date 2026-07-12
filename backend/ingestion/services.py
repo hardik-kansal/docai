@@ -84,3 +84,8 @@ class DocService:
 
     async def get_s3_key(self, document_id: str, user_id: str) -> str | None:
         return await self._repo.get_s3_key(uuid.UUID(document_id), uuid.UUID(user_id))
+
+    async def update_document_status(
+        self, document_id: uuid.UUID, status: str, error: str | None = None
+    ) -> None:
+        await self._repo.update_document_status(document_id, status, error)

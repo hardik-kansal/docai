@@ -213,7 +213,9 @@ logfire.instrument_redis()
 
 @app.exception_handler(GroundedJsonException)
 async def guardrail_exception_handler(request: Request, exc: GroundedJsonException):
-    return JSONResponse(status_code=exc.status_code, content=exc.grounded_answer)
+    return JSONResponse(
+        status_code=exc.status_code, content=exc.grounded_answer.model_dump()
+    )
 
 
 @app.get("/")

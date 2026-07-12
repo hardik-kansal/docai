@@ -126,7 +126,7 @@ class DocRepository:
             embedding_model,
             embedding_dim,
             error,
-        )
+        )  # returns id only if insert succesfull
         if doc_id is None:
             return await self._pool.fetchval(
                 """
@@ -136,6 +136,7 @@ class DocRepository:
                 user_id,
                 content_hash,
             )
+        return doc_id
 
     async def check_document_exists(
         self, user_id: uuid.UUID, content_hash: str
@@ -151,6 +152,23 @@ class DocRepository:
             content_hash,
         )
         return bool(result)
+
+    async def update_document_status(
+        self, document_id: uuid.UUID, status: str, error: str | None = None
+    ) -> None:
+        """Set document status (e.g. 'ready', 'error') after processing."""
+        await self._pool.execute(
+            """
+            UPDATE documents
+            SET status = $2,
+                error  = COALESCE($3, error),
+                updated_at = NOW()
+            WHERE id = $1;
+            """,
+            document_id,
+            status,
+            error,
+        )
 
     async def list_documents(self, user_id: uuid.UUID) -> list[DocumentRow]:
         rows = await self._pool.fetch(

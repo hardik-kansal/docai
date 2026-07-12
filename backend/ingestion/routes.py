@@ -142,7 +142,7 @@ async def minio_webhook(
 
 """
 
-header ssend by s3 using webhook
+header send by s3 using webhook
 {
  'host': 'host.docker.internal:8000',
  'user-agent': 'Go-http-client/1.1', 

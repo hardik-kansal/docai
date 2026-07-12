@@ -11,7 +11,8 @@ class PresignedURLRequest(BaseModel):
 
 
 class PresignedURLResponse(BaseModel):
-    upload_url: str
+    upload_url: str  # actual MinIO POST endpoint URL
+    upload_fields: dict[str, str]  # auth fields to include in multipart form
     object_key: str
     expires_in: int
 

@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from fastapi.responses import StreamingResponse
 from ..auth.dependencies import get_current_user, User
-from .services import ans_query
+from .services import ans_query, build_context
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/query")
+router = APIRouter(prefix="/api/v1/query")
 
 
 class QueryRequest(BaseModel):
@@ -50,12 +50,20 @@ points=[
 """
 
 
-@router.post("/")
+@router.post("")
 async def query(
     payload: QueryRequest,
     user: Annotated[User, Depends(get_current_user)],
 ) -> StreamingResponse:
+    context, llmResponse = await build_context(
+        payload.query, user, payload.document_ids
+    )
     return StreamingResponse(
-        ans_query(payload.query, user, payload.document_ids),
+        ans_query(llmResponse),
         media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
     )

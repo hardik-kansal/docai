@@ -192,10 +192,12 @@ def process_document_task(
                 print("embeding index time")
                 print((time.perf_counter() - start_time) * 1000)
 
+            # All chunks embedded and indexed — mark document ready
+            await docService.update_document_status(doc_id, "ready")
+
         asyncio.get_event_loop().run_until_complete(persist_document_data())
 
     finally:
-        get_boto3_client().delete_object(Bucket=bucket, Key=object_key)
         os.unlink(local_path)
 
 

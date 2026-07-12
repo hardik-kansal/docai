@@ -30,6 +30,6 @@ def set_llm(client: genai.Client) -> None:
 
 
 class GroundedJsonException(Exception):
-    def __init__(self, grounded_answer: GroundedAnswer, status_code: int = 200):
+    def __init__(self, grounded_answer: GroundedAnswer, status_code: int = 400):
         self.grounded_answer = grounded_answer
         self.status_code = status_code
