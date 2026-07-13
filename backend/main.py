@@ -1,3 +1,4 @@
+import asyncio
 from fastapi.responses import JSONResponse
 from qdrant_client import AsyncQdrantClient, models
 from fastembed import TextEmbedding
@@ -36,6 +37,8 @@ import boto3
 from botocore.config import Config
 import contextlib
 import logfire
+import json
+from .dependencies import get_connections_event
 
 logfire.configure(token=settings().LOGFIRE_TOKEN)
 logger = logging.getLogger(__name__)
@@ -179,6 +182,63 @@ async def shutdown_all_services():
         # if passed as .close() executes immediately
 
 
+async def redis_listener() -> None:
+    # though celery creates a new client per worker
+    # and assign it to same redis client, it is auth one
+    # since celery take a snapshot of code (not of runtime)
+    pubsub = get_redis_pool().pubsub()
+    await pubsub.subscribe(settings().REDIS_CHANNEL_DOCS)  # coroutine
+    try:
+        async for message in pubsub.listen():
+            if message["type"] != "message":
+                continue
+            """
+            this is first msg which is received, which just confirms 
+            subscription and actual data is in type message inside "data"
+            {
+                "type": "subscribe",
+                "pattern": None,
+                "channel": "events",
+                "data": 1
+            }
+            """
+            try:
+                # use .get if we want to loop over it
+                payload = json.loads(message["data"])
+                user_id = payload["user_id"]
+            except (KeyError, json.JSONDecodeError):
+                logger.warning("bad payload")
+                continue
+
+            # use .get(), never connections[user_id]
+            # the latter would make a defaultdict silently
+            # means create an empty set for every user_id
+            # even if that user not actually listening
+            # waste space, as connections store large no of empty sets
+            for q in list(get_connections_event().get(user_id, ())):
+                # this user_id set could be deleted in between
+                # which can cause RuntimeError:Set changed size during iteration
+                # does why did list to create a copy instead
+
+                if q.full():
+                    try:  # suppose execution to user_id sse part,
+                        # this q might emptied
+                        q.get_nowait()  # drop oldest
+                    except asyncio.QueueEmpty:
+                        pass
+                q.put_nowait(payload)
+                # put to queue which might have also discarded from connections
+                # by client sse function
+                # means could not discover through connections
+                # but still exist, but with no ref so after this completes
+                # eventually gonna clear out
+    except asyncio.CancelledError:
+        pass  # though lifespan already handles it
+    finally:
+        await pubsub.unsubscribe(settings().REDIS_CHANNEL_DOCS)
+        await pubsub.aclose()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await redis_start()
@@ -188,10 +248,19 @@ async def lifespan(app: FastAPI):
     embed_model()
     reranker_start()
     llm_start()
+    task = asyncio.create_task(redis_listener())
 
     # before startup
     yield
-    # after startup
+    # before shutdown
+
+    try:
+        task.cancel()  # only registers it as canceled
+        await task
+        # waiting we actually get out of task which happens
+        # when control give back to event loop in next await or asycn for
+    except asyncio.CancelledError:
+        pass
     try:
         await shutdown_all_services()
     except Exception:

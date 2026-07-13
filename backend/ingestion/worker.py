@@ -7,12 +7,12 @@ from .dependencies import (
     set_boto3_client,
     set_converter,
     set_chunker,
-    asyncpg,
     init_pg_connection,
     set_vectorPool,
     set_embedModel,
 )
-from ..auth.dependencies import set_asyncpg_pool
+import asyncpg
+from ..auth.dependencies import set_asyncpg_pool, set_redis_pool
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (
@@ -35,7 +35,7 @@ from transformers import AutoTokenizer
 import asyncio
 from qdrant_client import AsyncQdrantClient, models
 from fastembed import TextEmbedding
-
+import redis.asyncio as redis
 
 celery_app = Celery(
     "project1_celery",  # just application name
@@ -158,6 +158,14 @@ async def init_clients():
 
     embedModel = TextEmbedding(model_name=settings().EMBED_MODEL_ID)
     set_embedModel(embedModel)
+
+    _redis_pool = redis.Redis.from_url(
+        settings().REDIS_URL,
+        decode_responses=True,
+        max_connections=20,
+    )
+    await _redis_pool.ping()
+    set_redis_pool(_redis_pool)
 
 
 @worker_process_init.connect

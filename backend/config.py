@@ -41,6 +41,18 @@ class Settings(BaseSettings):
 
     LOGFIRE_TOKEN: str
 
+    REDIS_CHANNEL_DOCS: str = "document_active_event"
+    PING_INTERVAL: int = 15  # seconds — must be < any proxy idle timeout
+    QUEUE_MAXSIZE: int = 5
+    # user can open multiple tabs/mobile say, and then upload document
+    # each doc uploaded create a redis event
+    # all tabs have thieir own sse session to look for status update
+    # now if user do it for say 6 tabs, 6 events will be send to each queue
+    # but queue size is 5, say if queue event is not processed(send via sse)
+    # before 6th event came, oldest event would be discard by redis_listener
+    # so client endpoint would not recieve oldest event.
+    # but it is already stored in database, so refreshing would work fine.
+
 
 @lru_cache(maxsize=1)
 def settings() -> Settings:

@@ -22,6 +22,7 @@ import itertools
 from qdrant_client.models import PointStruct
 from ..config import settings
 from ..dependencies import call_with_retry
+from ..auth.dependencies import get_redis_pool
 
 
 logger = logging.getLogger(__name__)
@@ -123,7 +124,7 @@ def process_document_task(
 
         async def persist_document_data():
             start_time = time.perf_counter()
-            doc_id = await docService.register_document(
+            document_id = await docService.register_document(
                 user_id=user_id,
                 s3_key=object_key,
                 filename=filename,
@@ -144,7 +145,7 @@ def process_document_task(
 
             for chunk_batch in itertools.batched(enumerated_chunks, BATCH_SIZE):
                 db_batch = [
-                    docService.create_record_row(idx, chunk, chunker, doc_id)
+                    docService.create_record_row(idx, chunk, chunker, document_id)
                     for idx, chunk in chunk_batch
                 ]
                 start_time = time.perf_counter()
@@ -167,7 +168,7 @@ def process_document_task(
                         id=str(chunk_id),
                         vector={"dense": vector},
                         payload={
-                            "document_id": str(doc_id),
+                            "document_id": str(document_id),
                             "chunk_index": db_batch[i][2],
                             "text": db_batch[i][3],
                             "contextualized_text": texts[i],
@@ -193,7 +194,18 @@ def process_document_task(
                 print((time.perf_counter() - start_time) * 1000)
 
             # All chunks embedded and indexed — mark document ready
-            await docService.update_document_status(doc_id, "ready")
+            await docService.update_document_status(document_id, "ready")
+            message = {
+                "user_id": user_id,
+                "document_id": str(document_id),
+            }  # python dict needs to be converted to json
+
+            # publish doesnt store in redis,
+            # as soon as redis receives it, it forwards to all subscribers
+            # if nobody listening, drops it silently
+            await get_redis_pool().publish(
+                settings().REDIS_CHANNEL_DOCS, json.dumps(message)
+            )
 
         asyncio.get_event_loop().run_until_complete(persist_document_data())
 

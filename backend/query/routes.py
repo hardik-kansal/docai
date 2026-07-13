@@ -55,9 +55,19 @@ async def query(
     payload: QueryRequest,
     user: Annotated[User, Depends(get_current_user)],
 ) -> StreamingResponse:
+    # this logic needs to be seperated since if
+    # result is Json object rather than a stream,
+    # then we cant send json object internally since
+    # streaming response already have send 200ok
+    # need to send another header, body, status code for json\
+    # but we could have stream json Object
+    # though its not req.
     context, llmResponse = await build_context(
         payload.query, user, payload.document_ids
     )
+    # it immediately sends 200ok headers to client,
+    # opens a continous connection for body
+    # so inside it we cant raise another http status code
     return StreamingResponse(
         ans_query(llmResponse),
         media_type="text/event-stream",

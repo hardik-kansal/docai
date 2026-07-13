@@ -1,3 +1,4 @@
+import asyncio
 from ..models.schemas import PLANS, PlanType
 import logging
 import json
@@ -13,7 +14,8 @@ from ..auth.dependencies import get_current_user, User, get_auth_service, AuthSe
 from .dependencies import get_DocService
 from .services import DocService
 import uuid
-
+from sse_starlette.sse import EventSourceResponse
+from ..dependencies import get_connections_event
 
 logger = logging.getLogger(__name__)
 settings = settings()
@@ -84,13 +86,12 @@ async def get_upload_url(
 async def minio_webhook(
     request: Request,
     authService: Annotated[AuthService, Depends(get_auth_service)],
-) -> dict:
+):
     body_bytes: bytes = await request.body()
     payload = json.loads(body_bytes)
 
     # MinIO sends Records array — process each (usually 1 per webhook)
     records = payload.get("Records", [])
-    queued = []
 
     for record in records:
         event_name: str = record.get("eventName", "")
@@ -114,7 +115,7 @@ async def minio_webhook(
         # this process_document_task is a func in code, but it is wrapped inside decorator
         # and celery task class is returned
         await authService.update_storage(obj_key.split("/")[1], obj_size)
-        task = process_document_task.delay(
+        process_document_task.delay(
             bucket=bucket,
             object_key=obj_key,
             user_id=obj_key.split("/")[1],
@@ -123,21 +124,62 @@ async def minio_webhook(
             embedding_model=settings.EMBED_MODEL_ID,
             embedding_dim=settings.EMBED_MODEL_DIM,
         )
-        """
-        celery does not excecute immediately when delay() is called, instead create this json
-            {
-                "task": "process_document_task",
-                "args": [...],
-                "kwargs": {...}
-            }
-        and stores it in Redis. then ask redis for any new task.
+
+
+# expected to call before get upload url by frontend
+# then it would run until tab is closed, or refreshed
+# navigating to another tab doesnt mean connection is break
+@router.get("/check-doc-status")
+async def check_status(
+    user: Annotated[User, Depends(get_current_user)],
+    active_connections: Annotated[
+        dict[str, set[asyncio.Queue]], Depends(get_connections_event)
+    ],
+):
+    client_queue = asyncio.Queue()
+    active_connections[user.user_id].add(client_queue)
+    # this expects user_id to exist by default
+    # but since we have set to defualtdict, it creates empty set()
+    # then adds client_queue to it.
+
+    async def event_generator():
+        try:
+            while True:
+                event = await client_queue.get()
+                yield {"data": json.dumps(event)}
+        except asyncio.CancelledError:
+            """
+            Tab closed! queue.get() was interrupted instantly 
+            by the asgi server and send to event loop and received
+            once execution is handled to it which happens 
+            in fraction of a ms most often unless some task like 
+            cpu heavy is going on synco, so there is no await            
+            """
+            print("sse stream for doc status ended")
+            pass
+        finally:
+            active_connections[user.user_id].discard(client_queue)
+            if not active_connections[user.user_id]:
+                del active_connections[user.user_id]
+
+    return EventSourceResponse(event_generator(), ping=settings.PING_INTERVAL)
+
+
+# event source causes browser to reconnect, even if we raise error
+# only acc to standard, only HTTP 204 No content status code tells browser
+# to stop it legally.
 
 """
+celery does not excecute immediately when delay() is called, 
+instead creates this json
+    {
+        "task": "process_document_task",
+        "args": [...],
+        "kwargs": {...}
+    }
+and stores it in Redis. then ask redis for any new task.
 
-        queued.append({"task_id": task.id, "key": obj_key})
-
-    # header status code will be 202 passed, other wise minio again tries
-    return {"queued": queued, "count": len(queued)}
+"""
 
 
 """

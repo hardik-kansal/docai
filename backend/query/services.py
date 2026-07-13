@@ -105,6 +105,11 @@ async def build_context(
     query_text: str, user: User, document_ids: list[str] | None = None
 ) -> list[dict]:
     if await query_unsafe(query_text):
+        # we could have just return json Object
+        # but then we would have to make sure everytime send
+        # result to top layer till route where it actually sends
+        # now we just raise error it propogates by itself,
+        # and handled by app
         raise GroundedJsonException(grounded_answer=get_unsafe_response())
     logger.info("query safe")
     results = await hybrid_search(
@@ -142,7 +147,7 @@ async def build_context(
     for _, point in reranked:
         if await query_unsafe(point.payload["contextualized_text"]):
             logger.info(
-                f"chunk is not safe: {point.payload["contextualized_text"][:100]}"
+                f"chunk is not safe: {point.payload['contextualized_text'][:100]}"
             )
             raise GroundedJsonException(
                 GroundedAnswer(

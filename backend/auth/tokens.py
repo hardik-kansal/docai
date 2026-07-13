@@ -57,7 +57,8 @@ def _decode_token(raw_token: str, expected_type: str) -> TokenPayload:
         sub=data["sub"],
         scopes=[AccessScope(s) for s in data.get("scopes", [])],
         # .get(value to search, default)
-        # instead of error wither silently return or raise manual error
+        # if i used scopes[] then it creates a entry instead.
+        # might cause error later
         # -> defensive engineering
         exp=datetime.fromtimestamp(data["exp"], tz=timezone.utc),
         jti=data["jti"],

@@ -1,3 +1,5 @@
+from collections import defaultdict
+import asyncio
 from tenacity import (
     AsyncRetrying,
     stop_after_attempt,
@@ -39,6 +41,15 @@ circuit_breaker: CircuitBreaker = CircuitBreaker(
 
 def get_circuit_breaker() -> CircuitBreaker:
     return circuit_breaker
+
+
+_connections: dict[str, set[asyncio.Queue]] = defaultdict(set)
+# set is unordered so O(1) for both retrieve, store, delete
+# default dict ??
+
+
+def get_connections_event() -> dict[str, set[asyncio.Queue]]:
+    return _connections
 
 
 """
