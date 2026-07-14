@@ -23,6 +23,7 @@ function formatDate(iso: string): string {
 function StatusBadge({ status }: { status: DocumentStatus }) {
   const map: Record<DocumentStatus, { cls: string; label: string; dot: string }> = {
     pending: { cls: "badge-pending", label: "Pending", dot: "🕐" },
+    chunking: { cls: "badge-processing", label: "Chunking", dot: "✂️" },
     processing: { cls: "badge-processing", label: "Processing", dot: "⚙️" },
     pending_embedding: { cls: "badge-processing", label: "Embedding", dot: "🔄" },
     ready: { cls: "badge-ready", label: "Ready", dot: "✓" },
@@ -69,7 +70,7 @@ export default function DashboardPage() {
 
   if (!user) return null;
   const totalBytes = 2 * 1024 * 1024 * 1024; // 2GB
-  const usedPct = ((user.storage_used_bytes / totalBytes) * 100).toFixed(3);
+  const usedPct = ((user.storage_used_bytes / totalBytes) * 100).toFixed(2);
   const recentDocs = documents.slice(0, 5);
   const stats = [
     {

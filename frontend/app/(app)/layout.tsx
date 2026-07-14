@@ -141,7 +141,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [user, loading, router]);
 
-  if (loading) {
+  if (loading && !user) {
     return (
       <div
         style={{

@@ -29,6 +29,7 @@ function StatusBadge({ status }: { status: DocumentStatus }) {
   const map: Record<DocumentStatus, { cls: string; label: string }> = {
     pending:           { cls: "badge-pending",    label: "⏳ Pending"    },
     processing:        { cls: "badge-processing", label: "⚙️ Processing" },
+    chunking:          { cls: "badge-processing", label: "✂️ Chunking"   },
     pending_embedding: { cls: "badge-processing", label: "🔄 Embedding"  },
     ready:             { cls: "badge-ready",      label: "Active"      },
     error:             { cls: "badge-error",      label: "❌ Error"      },
@@ -146,7 +147,7 @@ function DocumentPanel({
             <div className="ubuntu-folder-dash" style={{ background: "var(--border-default)" }} />
           )}
           <div style={{ fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 600 }}>
-            {uploading ? "Uploading…" : (dragging ? "Drop here!" : "Drop or click to upload")}
+            {uploading ? "Uploading…" : (dragging ? "Drop here! (PDF only)" : "Drop or click to upload (PDF only)")}
           </div>
         </div>
 
@@ -383,7 +384,7 @@ function AssistantMessage({ msg }: { msg: ChatMessage }) {
       <div className="message-avatar">🤖</div>
       <div className="message-content" style={{ maxWidth: "95%", flexDirection: "row", gap: "20px" }}>
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "7px", minWidth: 0 }}>
-          {(msg.isThinking || msg.thoughts) && <ThoughtDropdown text={msg.thoughts ?? ""} isThinking={msg.isThinking} />}
+          {(msg.isThinking || msg.thoughts) && <ThoughtDropdown text={msg.thoughts ?? ""} isThinking={msg.isThinking ?? false} />}
           {(msg.content || msg.groundedAnswer) && (
             <div className={`message-text${msg.isStreaming && !msg.groundedAnswer ? " streaming-cursor" : ""}`}>
               <ReactMarkdown>
