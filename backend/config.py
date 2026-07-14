@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     minio_secret_key: str
     minio_bucket: str
     minio_region: str
+    MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_FASTAPI: str
 
     # Ingestion limits
     max_file_size_bytes: int

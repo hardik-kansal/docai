@@ -66,25 +66,6 @@ services:
       start_period: 5s
 
     
-
-  migrate:
-  # if i placed this inside api service as a command,
-  # in scaling, all replica containers of api will try to run it at same time. 
-    build:
-      # either build or look for image to pull
-      # if build, then first check cache if already build in another service
-      # we must give build here, bz each service is though isolated.
-      context: . # looks inside this folder for files, and dockerfile
-      target: runner # build till this stage, including runner
-    container_name: migrate
-    restart: "no" # only run this once, then turn off
-    env_file: # all those services which req settings() to init, must give all env
-      - .env
-    command: ["alembic", "upgrade", "head"]
-    depends_on:
-      postgres:
-        condition: service_healthy
-    
   minio:
     image: minio/minio:latest
     container_name: local_minio
@@ -96,6 +77,7 @@ services:
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}  
       MINIO_NOTIFY_WEBHOOK_ENABLE_FASTAPI: ${MINIO_NOTIFY_WEBHOOK_ENABLE_FASTAPI}
       MINIO_NOTIFY_WEBHOOK_ENDPOINT_FASTAPI: ${MINIO_NOTIFY_WEBHOOK_ENDPOINT_FASTAPI}
+      MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_FASTAPI: ${MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_FASTAPI}
 
     volumes:
       - minio_data:/data
@@ -107,19 +89,14 @@ services:
 
   api:
     build:
+    # either build or look for image to pull
+    # if build, then first check cache if already build in another service
       context: .
       target: runner
     container_name: api
     restart: unless-stopped
     env_file:
       - .env
-    # environment:
-    #   DD_AGENT_HOST: datadog
-    #   DD_TRACE_AGENT_PORT: "8126"
-    #   DD_SERVICE: clause-api
-    #   DD_ENV: ${DD_ENV:-development}
-    #   DD_VERSION: ${DD_VERSION:-0.1.0}
-    #   DD_LOGS_INJECTION: "true"
     ports:
       - "8000:8000"
     depends_on:
@@ -132,38 +109,10 @@ services:
 
     healthcheck:
       disable: true
-    # labels:
-    #   com.datadoghq.ad.logs: '[{"source": "python", "service": "clause-api"}]'
-
-
-  
-  # datadog:
-  #   image: gcr.io/datadoghq/agent:7
-  #   container_name: clause_datadog
-  #   restart: unless-stopped
-  #   environment:
-  #     DD_API_KEY: ${DD_API_KEY}
-  #     DD_SITE: datadoghq.com
-  #     DD_ENV: ${DD_ENV:-development}
-  #     DD_APM_ENABLED: "true"
-  #     DD_APM_NON_LOCAL_TRAFFIC: "true"          # accept traces from app container
-  #     DD_DOGSTATSD_NON_LOCAL_TRAFFIC: "true"    # accept metrics from app container
-  #     DD_PROCESS_AGENT_ENABLED: "true"
-  #     DD_CONTAINER_LABELS_AS_TAGS: "true"
-  #     DD_LOGS_ENABLED: "true"
-  #     DD_LOGS_CONFIG_CONTAINER_COLLECT_ALL: "true"
-  #   volumes:
-  #     - /var/run/docker.sock:/var/run/docker.sock:ro
-  #     - /proc/:/host/proc/:ro
-  #     - /sys/fs/cgroup/:/host/sys/fs/cgroup:ro
-  #     - /var/lib/docker/containers:/var/lib/docker/containers:ro
-  #   ports:
-  #     - "8126:8126"   # APM trace receiver
-  #     - "8125:8125/udp" # DogStatsD metrics
-
 
 volumes:
   postgres_data:
   redis_data:
   minio_data:
   qdrant_data:
+

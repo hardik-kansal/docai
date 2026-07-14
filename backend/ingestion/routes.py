@@ -2,7 +2,8 @@ import asyncio
 from ..models.schemas import PLANS, PlanType
 import logging
 import json
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Header, HTTPException
+import secrets
 from urllib.parse import unquote_plus
 from ..config import settings
 from ..models.document import PresignedURLResponse, DocumentResponse
@@ -86,13 +87,29 @@ async def get_upload_url(
     )
 
 
+# fastapi forwards header, and body to depends
+async def verify_webhook(authorization: str = Header(None)):
+    expected = settings.MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_FASTAPI
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=401, detail="Missing or invalid Authorization header"
+        )
+    token = authorization.split(" ")[1]
+    print(token)
+    if not secrets.compare_digest(token, expected):
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+
 # this is addded as env while launching minio using docker
 #  webhook fired by minio one user uploads to bucket
+# use eventBridge in production, and password checking if its actually aws
 @router.post("/webhook/minio")
 async def minio_webhook(
     request: Request,
     authService: Annotated[AuthService, Depends(get_auth_service)],
+    _=Depends(verify_webhook),
 ):
+    print(request.headers)
     body_bytes: bytes = await request.body()
     payload = json.loads(body_bytes)
 

@@ -18,14 +18,6 @@ minio-hook:
 # -d is detached, so will run in background rather in terminal 
 
 
-# datadog-start:
-# 	kill -9 $$(lsof -t -i:8000) 2>/dev/null || true
-# 	DD_LOGS_INJECTION=true \
-# 	DD_SERVICE="project1" \
-# 	DD_ENV="dev" \
-# 	DD_VERSION="0.1.0" \
-#   	uv run ddtrace-run uvicorn backend.main:app --host 0.0.0.0 --port 8000
-
 #rm -rf /tmp/fastembed_cache/ use this when using a diff embedding model
 celery-start:
 	uv run celery -A backend.ingestion.worker.celery_app worker -E -Q ingestion -l info --concurrency=4
@@ -36,8 +28,6 @@ celery-start:
 # -Q -> without it worker only listens and adds to redis, not process tasks
 # -l info for logging to show
 # --concurrency=4, creates 4 differnt seperate proccess, like 4 new applications
-
-
 
 
 start:
