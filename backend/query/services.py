@@ -80,6 +80,7 @@ async def hybrid_search(
 async def rerank_results(
     query: str,
     points: list[ScoredPoint],
+    user_id: str,
     top_n: int = 10,
     budget_ms: int = 250,
 ) -> list[tuple[float, ScoredPoint]]:
@@ -95,6 +96,16 @@ async def rerank_results(
     except asyncio.TimeoutError:
         # fall back to just topn rather than failing the request
         logger.warning("reranking- fall back to just topn")
+        await get_redis_pool().publish(
+            settings().REDIS_CHANNEL_DOCS,
+            json.dumps(
+                {
+                    "type": "query_progress",
+                    "user_id": user_id,
+                    "message": "> Reranking timed out, falling back to top initial results.",
+                }
+            ),
+        )
         return [(point.score, point) for point in points[:top_n]]
     logger.info("reranking done")
     ranked = sorted(zip(points, scores), key=lambda x: x[1], reverse=True)
@@ -110,6 +121,16 @@ async def build_context(
         # result to top layer till route where it actually sends
         # now we just raise error it propogates by itself,
         # and handled by app
+        await get_redis_pool().publish(
+            settings().REDIS_CHANNEL_DOCS,
+            json.dumps(
+                {
+                    "type": "query_progress",
+                    "user_id": user.user_id,
+                    "message": "> Query is unsafe.",
+                }
+            ),
+        )
         raise GroundedJsonException(grounded_answer=get_unsafe_response())
     logger.info("query safe")
     await get_redis_pool().publish(
@@ -129,6 +150,16 @@ async def build_context(
     )
     if results is None:
         logger.info("NO_RELEVANT_CONTEXT")
+        await get_redis_pool().publish(
+            settings().REDIS_CHANNEL_DOCS,
+            json.dumps(
+                {
+                    "type": "query_progress",
+                    "user_id": user.user_id,
+                    "message": "> Hybrid search couldnt found any relevant context",
+                }
+            ),
+        )
         raise GroundedJsonException(
             grounded_answer=GroundedAnswer(
                 answer=AbstainOutput.NO_RELEVANT_CONTEXT,
@@ -153,6 +184,7 @@ async def build_context(
     reranked = await rerank_results(
         query=query_text,
         points=results.points,
+        user_id=user.user_id,
         top_n=10,
     )
 
@@ -169,6 +201,16 @@ async def build_context(
         if await query_unsafe(point.payload["contextualized_text"]):
             logger.info(
                 f"chunk is not safe: {point.payload['contextualized_text'][:100]}"
+            )
+            await get_redis_pool().publish(
+                settings().REDIS_CHANNEL_DOCS,
+                json.dumps(
+                    {
+                        "type": "query_progress",
+                        "user_id": user.user_id,
+                        "message": f"> chunk is not safe: {point.payload['contextualized_text'][:100]}",
+                    }
+                ),
             )
             raise GroundedJsonException(
                 GroundedAnswer(
@@ -209,6 +251,8 @@ async def build_context(
 
 
 async def ans_query(llmResponse, context):
+    yield f"data: {json.dumps({'type': 'context', 'content': context})}\n\n"
+
     accumulated_thoughts = ""
     accumulated_json_tokens = ""
 
@@ -252,7 +296,6 @@ async def ans_query(llmResponse, context):
         #         yield f"data: {json.dumps({'type': 'hhem_verification', 'score': hhem_score, 'status': 'passed' if hhem_score >= 0.5 else 'failed'})}\n\n"
         #     except json.JSONDecodeError:
         #         logger.error("Failed downstream parsing step for streaming string compilation.")
-        yield f"data: {json.dumps({'type': 'context', 'content': context})}\n\n"
 
     except Exception:
         logger.exception(

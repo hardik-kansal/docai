@@ -20,10 +20,8 @@ class GroundedAnswer(BaseModel):
 
 
 class AbstainOutput(StrEnum):
-    INPUT_REJECTED = "input_rejected"
-    NO_RELEVANT_CONTEXT = """
-    Could not retrieve chunks at the moment..
-    """
-    GENERATION_UNAVAILABLE = """
-    llm generation failed here it is req chunks
-    """
+    INPUT_REJECTED = (
+        "I cannot fulfill this request as it violates safety or moderation guidelines."
+    )
+    NO_RELEVANT_CONTEXT = "I could not find any relevant information in the provided documents to answer your question."
+    GENERATION_UNAVAILABLE = "I am currently unable to generate a response due to a temporary service issue. Please refer to the retrieved documents in the meantime."
