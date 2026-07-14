@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     RERANK_MODEL_ID: str
 
     QDRANT_URL: str
-    COLLECTION: str = "contract"
+    QDRANT_API_KEY: str
+    COLLECTION: str
 
     GEMINI_KEY: str
     GEMINI_MODEL: str
@@ -42,7 +43,7 @@ class Settings(BaseSettings):
 
     LOGFIRE_TOKEN: str
 
-    REDIS_CHANNEL_DOCS: str = "document_active_event"
+    REDIS_CHANNEL_DOCS: str
     PING_INTERVAL: int = 15  # seconds — must be < any proxy idle timeout
     QUEUE_MAXSIZE: int = 5
     # user can open multiple tabs/mobile say, and then upload document

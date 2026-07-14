@@ -13,12 +13,14 @@ services:
     # > is just so that we can write commands in multiple lines
     command: >
       redis-server
-      --maxmemory 256mb
+      --maxmemory 512mb
       --maxmemory-policy allkeys-lru
     volumes:
       - redis_data:/data
-    ports:
-      - "6379:6379"
+    # never in production fastapi is running on same network can access it
+    # but must not be open to public internet
+    # ports:
+    #   - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -39,19 +41,13 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
-        condition: service_healthy
-      qdrant:
         condition: service_healthy
 
     healthcheck:
       disable: true
 
 volumes:
-  postgres_data:
   redis_data:
-  minio_data:
-  qdrant_data:
+
 

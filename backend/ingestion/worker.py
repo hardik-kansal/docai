@@ -132,7 +132,9 @@ async def init_clients():
     )
     set_asyncpg_pool(pool)
 
-    vectorPool = AsyncQdrantClient(url=settings().QDRANT_URL)
+    vectorPool = AsyncQdrantClient(
+        url=settings().QDRANT_URL, api_key=settings().QDRANT_API_KEY
+    )
     name = settings().COLLECTION
     if not await vectorPool.collection_exists(name):
         await vectorPool.create_collection(
