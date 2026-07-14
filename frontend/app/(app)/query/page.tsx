@@ -130,7 +130,7 @@ function DocumentPanel({
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.txt,.docx,.md"
+            accept=".pdf"
             style={{ display: "none" }}
             id="file-input"
             onChange={(e) => {
@@ -194,13 +194,13 @@ function DocumentPanel({
           </div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-            {documents.map((doc) => {
+            {documents.map((doc, index) => {
               const isReady = doc.status === "ready";
               const isSelected = selectedDocs.has(doc.id);
               return (
                 <div
-                  key={doc.id}
-                  id={`doc-item-${doc.id}`}
+                  key={`${doc.id}-${index}`}
+                  id={`doc-item-${doc.id}-${index}`}
                   className={`doc-list-item ${isReady ? "ready-doc" : ""}`}
                   onClick={() => isReady && onToggleDoc(doc.id)}
                   style={{
@@ -431,7 +431,7 @@ function QueryPageInner() {
   const initialDoc = searchParams.get("doc");
 
   const { messages, isStreaming, sendQuery, cancelStream, clearMessages } = useQuery();
-  const { documents, uploading, uploadFile, fetchDocuments } = useDocuments();
+  const { documents, uploading, uploadFile } = useDocuments();
 
   const [input, setInput] = useState("");
   const [selectedDocs, setSelectedDocs] = useState<Set<string>>(
@@ -522,12 +522,11 @@ function QueryPageInner() {
       await uploadFile(file);
       setUploadMsg({ type: "success", text: `"${file.name}" uploaded — processing…` });
       setTimeout(() => setUploadMsg(null), 6000);
-      // Kick off a fresh fetch so the new doc appears promptly
-      setTimeout(() => fetchDocuments(), 1500);
+      // The placeholder is optimistically added in useDocuments.ts, and SSE handles real updates.
     } catch {
       setUploadMsg({ type: "error", text: "Upload failed. Please try again." });
     }
-  }, [uploadFile, fetchDocuments]);
+  }, [uploadFile]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

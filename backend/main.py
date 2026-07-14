@@ -249,6 +249,7 @@ async def lifespan(app: FastAPI):
     reranker_start()
     llm_start()
     task = asyncio.create_task(redis_listener())
+    logger.info("redis_listener started")
 
     # before startup
     yield

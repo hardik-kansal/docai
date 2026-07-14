@@ -2,15 +2,19 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { ingestionApi, ApiError } from "@/lib/api";
 import type { DocumentResponse, PresignedURLResponse } from "@/lib/types";
+import { useAuth } from "./useAuth";
 
 export function useDocuments() {
+  const { user, updateUser } = useAuth();
   const [documents, setDocuments] = useState<DocumentResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const userId = user?.user_id;
 
   const fetchDocuments = useCallback(async () => {
+    if (!userId) return; // Don't fetch if not logged in
     try {
       const docs = await ingestionApi.listDocuments();
       setDocuments((currentDocs) => {
@@ -23,55 +27,68 @@ export function useDocuments() {
       setError(null);
     } catch (err) {
       if (err instanceof ApiError && (err.status === 400 || err.status === 401)) {
-        // Not authenticated yet — skip silently
         return;
       }
       setError("Failed to load documents");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
-  // Initial fetch on mount
+  // Initial fetch when user becomes available
   useEffect(() => {
     fetchDocuments();
   }, [fetchDocuments]);
 
-  // Poll every 3s when any document is processing/pending
+  // Listen for real-time document status updates via SSE
   useEffect(() => {
-    const hasInProgress = documents.some(
-      (d) =>
-        d.status === "pending" ||
-        d.status === "processing" ||
-        d.status === "pending_embedding"
-    );
+    if (!userId) return; // Wait until authenticated
 
-    if (hasInProgress) {
-      if (!pollRef.current) {
-        pollRef.current = setInterval(fetchDocuments, 3000);
+    const eventSource = new EventSource("/ingestion/check-doc-status", {
+      withCredentials: true, // ensures cookies are sent for authentication
+    });
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+
+        if (data.type === "storage_update") {
+          updateUser({ storage_used_bytes: data.storage_used_bytes });
+          return;
+        }
+
+        if (data.type === "query_progress") {
+          window.dispatchEvent(new CustomEvent("query_progress", { detail: data.message }));
+          return;
+        }
+
+        if (data.object_key && data.status) {
+          setDocuments((currentDocs) =>
+            currentDocs.map((doc) =>
+              doc.s3_key === data.object_key || (data.document_id && doc.id === data.document_id)
+                ? { 
+                    ...doc, 
+                    status: data.status as DocumentResponse["status"],
+                    ...(data.document_id ? { id: data.document_id } : {})
+                  }
+                : doc
+            )
+          );
+        }
+      } catch (err) {
+        console.error("Failed to parse SSE message", err);
       }
-    } else {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    }
+    };
+
+    eventSource.onerror = (err) => {
+      console.log("SSE connection error", err);
+      // EventSource automatically tries to reconnect, so we don't need manual reconnection logic here.
+    };
 
     return () => {
-      // Don't clear on every re-render — only let the else-branch above clear it.
-      // (The interval is properly cleared when component unmounts via useEffect cleanup.)
+      eventSource.close();
     };
-  }, [documents, fetchDocuments]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
-  }, []);
+  }, [userId]);
 
   /**
    * Full upload flow:
@@ -119,9 +136,6 @@ export function useDocuments() {
           error: null,
         };
         setDocuments((prev) => [placeholder, ...prev]);
-
-        // Refresh after a short delay for the webhook to fire
-        setTimeout(fetchDocuments, 2000);
       } catch (err) {
         const msg =
           err instanceof ApiError ? err.message : "Upload failed";

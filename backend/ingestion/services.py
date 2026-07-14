@@ -73,7 +73,7 @@ class DocService:
 
         return document_id
 
-    async def check_document(self, user_id: str, content_hash: str) -> bool:
+    async def check_document(self, user_id: str, content_hash: str) -> tuple[bool, str]:
         return await self._repo.check_document_exists(
             user_id=uuid.UUID(user_id),
             content_hash=content_hash,

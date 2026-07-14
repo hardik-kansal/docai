@@ -4,7 +4,7 @@ from qdrant_client import models
 from qdrant_client.models import ScoredPoint
 from ..ingestion.dependencies import get_embedModel, get_vectorPool
 from ..config import settings
-from ..auth.dependencies import User
+from ..auth.dependencies import User, get_redis_pool
 from .dependencies import get_reranker, get_llm, GroundedJsonException
 from ..dependencies import call_with_retry, get_circuit_breaker
 import asyncio
@@ -112,6 +112,16 @@ async def build_context(
         # and handled by app
         raise GroundedJsonException(grounded_answer=get_unsafe_response())
     logger.info("query safe")
+    await get_redis_pool().publish(
+        settings().REDIS_CHANNEL_DOCS,
+        json.dumps(
+            {
+                "type": "query_progress",
+                "user_id": user.user_id,
+                "message": "> Query is safe. Starting hybrid search...",
+            }
+        ),
+    )
     results = await hybrid_search(
         query_text=query_text,
         user=user,
@@ -129,6 +139,16 @@ async def build_context(
             )
         )
     logger.info("Hybrid search completed")
+    await get_redis_pool().publish(
+        settings().REDIS_CHANNEL_DOCS,
+        json.dumps(
+            {
+                "type": "query_progress",
+                "user_id": user.user_id,
+                "message": "> Hybrid search completed. Reranking chunks...",
+            }
+        ),
+    )
 
     # cross encoder
     reranked = await rerank_results(
@@ -159,6 +179,16 @@ async def build_context(
                 )
             )
     logger.info("all chunks safe")
+    await get_redis_pool().publish(
+        settings().REDIS_CHANNEL_DOCS,
+        json.dumps(
+            {
+                "type": "query_progress",
+                "user_id": user.user_id,
+                "message": "> Reranking complete. Calling LLM for generation...",
+            }
+        ),
+    )
     try:
         llmResponse = await call_llm(query_text, context)
     except CircuitBreakerError:

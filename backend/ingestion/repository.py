@@ -140,18 +140,19 @@ class DocRepository:
 
     async def check_document_exists(
         self, user_id: uuid.UUID, content_hash: str
-    ) -> bool:
+    ) -> tuple[bool, str]:
         result = await self._pool.fetchval(
             """
-                SELECT EXISTS (
-                    SELECT 1 FROM documents 
-                    WHERE user_id = $1 AND content_hash = $2
-                );
+                SELECT s3_key FROM documents 
+                WHERE user_id = $1 AND content_hash = $2
+                LIMIT 1;
                 """,
             user_id,
             content_hash,
         )
-        return bool(result)
+        if result is not None:
+            return True, result
+        return False, ""
 
     async def update_document_status(
         self, document_id: uuid.UUID, status: str, error: str | None = None

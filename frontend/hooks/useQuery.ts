@@ -1,5 +1,5 @@
 "use client";
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { postQuery, ApiError } from "@/lib/api";
 import { parseStream } from "@/lib/stream";
 import type { ChatMessage, GroundedAnswer, UsageStats } from "@/lib/types";
@@ -21,6 +21,26 @@ export function useQuery() {
     },
     []
   );
+
+  useEffect(() => {
+    const handleQueryProgress = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      setMessages((prev) => {
+        if (prev.length === 0) return prev;
+        const lastMsg = prev[prev.length - 1];
+        if (lastMsg.role === "assistant" && lastMsg.isThinking) {
+          return [
+            ...prev.slice(0, -1),
+            { ...lastMsg, thoughts: (lastMsg.thoughts ?? "") + customEvent.detail + "\n\n" }
+          ];
+        }
+        return prev;
+      });
+    };
+
+    window.addEventListener("query_progress", handleQueryProgress);
+    return () => window.removeEventListener("query_progress", handleQueryProgress);
+  }, []);
 
   const sendQuery = useCallback(
     async (queryText: string, documentIds?: string[] | null): Promise<void> => {

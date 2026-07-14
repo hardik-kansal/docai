@@ -84,6 +84,7 @@ def process_document_task(
     get_boto3_client().download_file(
         bucket, object_key, local_path, Config=s3_download_config
     )
+    print("download completed")
 
     try:
         document_hash = None
@@ -96,15 +97,12 @@ def process_document_task(
         print((time.perf_counter() - start_time) * 1000)
         docService = get_DocService()
 
-        # async def check_if_duplicate_document() -> bool:
+        # async def check_if_duplicate_document() -> tuple[bool, str]:
         #     return await docService.check_document(user_id, document_hash)
 
-        # is_duplicate = asyncio.get_event_loop().run_until_complete(
+        # is_duplicate, existing_s3_key = asyncio.get_event_loop().run_until_complete(
         #     check_if_duplicate_document()
         # )
-        # if is_duplicate:
-        #     return  # what if document added chunks failed
-        #     # not idompotent
 
         result = get_converter().convert(local_path)  # 3 sec for one page
         # ram peaks here, complete file into ram, can do batch but bad results
@@ -119,11 +117,19 @@ def process_document_task(
 
         doc = result.document  # everything in ram
         chunker = get_chunker()
+
+        message = {"user_id": user_id, "object_key": object_key, "status": "chunking"}
+        asyncio.get_event_loop().run_until_complete(
+            get_redis_pool().publish(settings().REDIS_CHANNEL_DOCS, json.dumps(message))
+        )
+
         chunks = chunker.chunk(doc)  # type-> iterrator[basechunk]
         # all chunks have not computed yet, this is a generator, use next(),
 
         async def persist_document_data():
             start_time = time.perf_counter()
+            # register make sure (user_id,content_hash) have unique index
+            # in case of duplication, no document is registerred again
             document_id = await docService.register_document(
                 user_id=user_id,
                 s3_key=object_key,
@@ -157,6 +163,16 @@ def process_document_task(
 
                 # v is numpy array of floats, sync cpu heavy
                 start_time = time.perf_counter()
+                message = {
+                    "user_id": user_id,
+                    "object_key": object_key,
+                    "document_id": str(document_id),
+                    "status": "pending_embedding",
+                }
+                await get_redis_pool().publish(
+                    settings().REDIS_CHANNEL_DOCS, json.dumps(message)
+                )
+
                 vectors: list[list[float]] = [
                     v.tolist() for v in embed_model.embed(texts)
                 ]
@@ -186,8 +202,9 @@ def process_document_task(
                     collection_name=settings().COLLECTION,
                     points=points,
                     wait=False,
-                    # means for any read query doesnt wait,
-                    # so now for all batches in run parallelly
+                    # first batch send, with wait=False wait for it to complete
+                    # so now it sends back ack immediately,
+                    # another batch could be send, and would be insert in parallel
                     # else would have complete index sequentially batch by batch
                 )
                 print("embeding index time")
@@ -197,7 +214,9 @@ def process_document_task(
             await docService.update_document_status(document_id, "ready")
             message = {
                 "user_id": user_id,
+                "object_key": object_key,
                 "document_id": str(document_id),
+                "status": "ready",
             }  # python dict needs to be converted to json
 
             # publish doesnt store in redis,
@@ -210,7 +229,6 @@ def process_document_task(
         asyncio.get_event_loop().run_until_complete(persist_document_data())
 
     finally:
-        logger.error("could not parsed")
         os.unlink(local_path)
 
 

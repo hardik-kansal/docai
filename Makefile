@@ -1,6 +1,12 @@
 docker-start:
 	docker compose up -d postgres redis minio qdrant
 
+# i first installed postgres, redis on system level
+# so when docker engine restarts system servies which are enable by default
+# takes port, postgres have safety so it silently allows it,
+# but redis fails to start saying port mapping failed
+# disable them system level first for once
+
 minio-hook:
 	docker exec local_minio mc alias set local http://localhost:9000 hardik password
 	docker exec local_minio mc event add local/contracts arn:minio:sqs::FASTAPI:webhook --event put -p

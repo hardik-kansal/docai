@@ -10,7 +10,13 @@ from ..models.document import PresignedURLResponse, DocumentResponse
 from typing import Annotated
 from .storage import generate_presigned_post_url, generate_presigned_get_url
 from .tasks import process_document_task
-from ..auth.dependencies import get_current_user, User, get_auth_service, AuthService
+from ..auth.dependencies import (
+    get_current_user,
+    User,
+    get_auth_service,
+    AuthService,
+    get_redis_pool,
+)
 from .dependencies import get_DocService
 from .services import DocService
 import uuid
@@ -114,16 +120,33 @@ async def minio_webhook(
 
         # this process_document_task is a func in code, but it is wrapped inside decorator
         # and celery task class is returned
-        await authService.update_storage(obj_key.split("/")[1], obj_size)
+        user_id_str = obj_key.split("/")[1]
+        updated_user = await authService.update_storage(user_id_str, obj_size)
+        if updated_user:
+            storage_message = {
+                "user_id": str(updated_user.user_id),
+                "storage_used_bytes": updated_user.storage_used_bytes,
+                "type": "storage_update",
+            }
+            await get_redis_pool().publish(
+                settings.REDIS_CHANNEL_DOCS, json.dumps(storage_message)
+            )
+
         process_document_task.delay(
             bucket=bucket,
             object_key=obj_key,
-            user_id=obj_key.split("/")[1],
+            user_id=user_id_str,
             access_scope="default",
             filename=obj_key.split("/")[3],
             embedding_model=settings.EMBED_MODEL_ID,
             embedding_dim=settings.EMBED_MODEL_DIM,
         )
+        message = {
+            "user_id": user_id_str,
+            "object_key": obj_key,
+            "status": "processing",
+        }
+        await get_redis_pool().publish(settings.REDIS_CHANNEL_DOCS, json.dumps(message))
 
 
 # expected to call before get upload url by frontend
@@ -131,6 +154,7 @@ async def minio_webhook(
 # navigating to another tab doesnt mean connection is break
 @router.get("/check-doc-status")
 async def check_status(
+    request: Request,
     user: Annotated[User, Depends(get_current_user)],
     active_connections: Annotated[
         dict[str, set[asyncio.Queue]], Depends(get_connections_event)
@@ -145,16 +169,19 @@ async def check_status(
     async def event_generator():
         try:
             while True:
-                event = await client_queue.get()
-                yield {"data": json.dumps(event)}
+                try:
+                    # wait_for raises TimeoutError if no message arrives in time
+                    # so we can check disconnect without waiting forever on .get()
+                    event = await asyncio.wait_for(client_queue.get(), timeout=60)
+                    logger.info(f"SSE sending event: {json.dumps(event)}")
+                    yield {"data": json.dumps(event)}
+                except asyncio.TimeoutError:
+                    # no message yet — check if client has gone away
+                    if await request.is_disconnected():
+                        break
+                        # user is gone, so browser wont try to connect
+
         except asyncio.CancelledError:
-            """
-            Tab closed! queue.get() was interrupted instantly 
-            by the asgi server and send to event loop and received
-            once execution is handled to it which happens 
-            in fraction of a ms most often unless some task like 
-            cpu heavy is going on synco, so there is no await            
-            """
             print("sse stream for doc status ended")
             pass
         finally:
@@ -162,12 +189,21 @@ async def check_status(
             if not active_connections[user.user_id]:
                 del active_connections[user.user_id]
 
-    return EventSourceResponse(event_generator(), ping=settings.PING_INTERVAL)
+    return EventSourceResponse(
+        event_generator(),
+        ping=settings.PING_INTERVAL,
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
+# this sends 200 ok immediately
 # event source causes browser to reconnect, even if we raise error
 # only acc to standard, only HTTP 204 No content status code tells browser
-# to stop it legally.
+# to stop it legally,but we coulnt send after this return is called
 
 """
 celery does not excecute immediately when delay() is called, 

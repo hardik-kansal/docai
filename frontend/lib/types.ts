@@ -29,6 +29,7 @@ export interface UserProfile {
 export type DocumentStatus =
   | "pending"
   | "processing"
+  | "chunking"
   | "ready"
   | "error"
   | "pending_embedding";
