@@ -30,7 +30,7 @@ function Sidebar({
       <div className="sidebar-logo" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <div className="sidebar-logo-icon">🧠</div>
-          <span className="sidebar-logo-text">Nexus AI</span>
+          <span className="sidebar-logo-text">Docai</span>
         </div>
       </div>
 

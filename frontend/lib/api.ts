@@ -81,17 +81,17 @@ export const authApi = {
 
 export const ingestionApi = {
   listDocuments(): Promise<DocumentResponse[]> {
-    return apiFetch("/ingestion/documents");
+    return apiFetch("/api/v1/ingestion/documents");
   },
 
   getUploadUrl(filename: string): Promise<PresignedURLResponse> {
     return apiFetch(
-      `/ingestion/get-upload-url?filename=${encodeURIComponent(filename)}`
+      `/api/v1/ingestion/get-upload-url?filename=${encodeURIComponent(filename)}`
     );
   },
 
   getViewUrl(documentId: string): Promise<ViewURLResponse> {
-    return apiFetch(`/ingestion/documents/${documentId}/view-url`);
+    return apiFetch(`/api/v1/ingestion/documents/${documentId}/view-url`);
   },
 
   /**

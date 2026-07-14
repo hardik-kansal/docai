@@ -26,7 +26,7 @@ from ..dependencies import get_connections_event
 logger = logging.getLogger(__name__)
 settings = settings()
 
-router = APIRouter(prefix="/ingestion")
+router = APIRouter(prefix="/api/v1/ingestion")
 
 
 @router.get("/documents")

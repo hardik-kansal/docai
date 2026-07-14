@@ -3,12 +3,12 @@ import { AuthProvider } from "@/hooks/useAuth";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nexus AI — Intelligent Document Assistant",
+  title: "Docai — Intelligent Document Assistant",
   description:
     "Upload documents and get grounded, cited answers with confidence scores powered by state-of-the-art AI retrieval.",
   keywords: ["AI", "document intelligence", "Q&A", "RAG", "search"],
   openGraph: {
-    title: "Nexus AI — Intelligent Document Assistant",
+    title: "Docai — Intelligent Document Assistant",
     description: "Upload documents and ask questions with grounded citations.",
     type: "website",
   },

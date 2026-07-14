@@ -44,7 +44,7 @@ export function useDocuments() {
   useEffect(() => {
     if (!userId) return; // Wait until authenticated
 
-    const eventSource = new EventSource("/ingestion/check-doc-status", {
+    const eventSource = new EventSource("/api/v1/ingestion/check-doc-status", {
       withCredentials: true, // ensures cookies are sent for authentication
     });
 

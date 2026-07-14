@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 settings = settings()
 
 
-MINIO_WEBHOOK_SECRET = settings.minio_secret_key
 _ALLOWED_MIME_TYPES: Final[frozenset[str]] = frozenset(
     {
         "application/pdf",

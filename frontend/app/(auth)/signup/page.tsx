@@ -46,7 +46,7 @@ export default function SignupPage() {
         <div className="auth-hero-brand">
           <div style={{ position: "relative", zIndex: 1, textAlign: "center", width: "100%", maxWidth: 650, margin: "0 auto" }}>
             <h1 style={{ marginBottom: 12, color: "#ffffff", fontSize: "3rem", fontWeight: 800, letterSpacing: "-0.02em" }}>
-              Nexus AI
+              Docai
             </h1>
             <p style={{ color: "#dddddd", lineHeight: 1.75, fontSize: "1.1rem", marginBottom: 40, fontWeight: 500 }}>
               Intelligent Document Processing Pipeline

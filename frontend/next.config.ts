@@ -9,10 +9,6 @@ const nextConfig: NextConfig = {
         source: "/api/v1/:path*",
         destination: `${API_URL}/api/v1/:path*`,
       },
-      {
-        source: "/ingestion/:path*",
-        destination: `${API_URL}/ingestion/:path*`,
-      },
     ];
   },
   reactStrictMode: false,
