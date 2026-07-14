@@ -10,7 +10,7 @@ from ..dependencies import call_with_retry, get_circuit_breaker
 import asyncio
 from starlette.concurrency import run_in_threadpool
 import logging
-from ..models.llm_ouput import GroundedAnswer, AbstainReason, AbstainOutput, Citation
+from ..models.llm_ouput import GroundedAnswer, AbstainReason, AbstainOutput
 from ..guardrail.llmGuard import classify
 import json
 
@@ -132,7 +132,6 @@ async def build_context(
         raise GroundedJsonException(
             grounded_answer=GroundedAnswer(
                 answer=AbstainOutput.NO_RELEVANT_CONTEXT,
-                citations=[],
                 confidence=0.0,
                 abstained=True,
                 abstain_reason=AbstainReason.NO_RELEVANT_CONTEXT,
@@ -159,7 +158,9 @@ async def build_context(
 
     context = [
         {
-            "chunk_id": point.payload["chunk_index"],
+            "document_id": point.payload["document_id"],
+            "chunk_index": point.payload["chunk_index"],
+            "page_numbers": point.payload["page_numbers"],
             "contextualized_text": point.payload["contextualized_text"],
         }
         for _, point in reranked
@@ -172,7 +173,6 @@ async def build_context(
             raise GroundedJsonException(
                 GroundedAnswer(
                     answer=AbstainOutput.INPUT_REJECTED,
-                    citations=[],
                     confidence=0.0,
                     abstained=True,
                     abstain_reason=AbstainReason.INPUT_REJECTED,
@@ -200,12 +200,6 @@ async def build_context(
         raise GroundedJsonException(
             GroundedAnswer(
                 answer=AbstainOutput.GENERATION_UNAVAILABLE,
-                citations=[
-                    Citation(
-                        chunk_id=str(c["chunk_id"]), quote=c["contextualized_text"]
-                    )
-                    for c in context
-                ],
                 confidence=0.0,
                 abstained=True,
                 abstain_reason=AbstainReason.GENERATION_UNAVAILABLE,
@@ -214,7 +208,7 @@ async def build_context(
     return context, llmResponse
 
 
-async def ans_query(llmResponse):
+async def ans_query(llmResponse, context):
     accumulated_thoughts = ""
     accumulated_json_tokens = ""
 
@@ -258,6 +252,7 @@ async def ans_query(llmResponse):
         #         yield f"data: {json.dumps({'type': 'hhem_verification', 'score': hhem_score, 'status': 'passed' if hhem_score >= 0.5 else 'failed'})}\n\n"
         #     except json.JSONDecodeError:
         #         logger.error("Failed downstream parsing step for streaming string compilation.")
+        yield f"data: {json.dumps({'type': 'context', 'content': context})}\n\n"
 
     except Exception:
         logger.exception(
@@ -270,8 +265,7 @@ async def ans_query(llmResponse):
 @get_circuit_breaker()
 async def call_llm(query_text: str, context: list[dict]):
     ctx_block = "\n\n".join(
-        f"""Chunk ID: {c["chunk_id"]}
-    Chunk Contextualized Text:
+        f"""Chunk Text:
     {c["contextualized_text"]}"""
         for c in context
     )
@@ -307,7 +301,6 @@ async def call_llm(query_text: str, context: list[dict]):
 def get_unsafe_response() -> GroundedAnswer:
     return GroundedAnswer(
         answer=AbstainOutput.INPUT_REJECTED,
-        citations=[],
         confidence=0.0,
         abstained=True,
         abstain_reason=AbstainReason.INPUT_REJECTED,

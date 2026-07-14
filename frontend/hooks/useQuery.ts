@@ -109,6 +109,10 @@ export function useQuery() {
               );
             },
 
+            onContext: (chunks) => {
+              updateMessage(assistantId, { contextChunks: chunks });
+            },
+
             onUsage: (usage: UsageStats) => {
               updateMessage(assistantId, { usage });
             },

@@ -69,7 +69,7 @@ async def query(
     # opens a continous connection for body
     # so inside it we cant raise another http status code
     return StreamingResponse(
-        ans_query(llmResponse),
+        ans_query(llmResponse, context),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache, no-transform",

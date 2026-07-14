@@ -16,6 +16,7 @@ function StatusBadge({ status }: { status: DocumentStatus }) {
   const map: Record<DocumentStatus, { cls: string; label: string }> = {
     pending: { cls: "badge-pending", label: "⏳ Pending" },
     processing: { cls: "badge-processing", label: "⚙️ Processing" },
+    chunking: { cls: "badge-processing", label: "✂️ Chunking" },
     pending_embedding: { cls: "badge-processing", label: "🔄 Embedding" },
     ready: { cls: "badge-ready", label: "✅ Ready" },
     error: { cls: "badge-error", label: "❌ Error" },
@@ -178,14 +179,10 @@ export default function DocumentsPage() {
   } = useDocuments();
   const router = useRouter();
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadSuccess, setUploadSuccess] = useState<string | null>(null);
   const handleUpload = async (file: File) => {
     setUploadError(null);
-    setUploadSuccess(null);
     try {
       await uploadFile(file);
-      setUploadSuccess(`"${file.name}" uploaded — processing will begin shortly.`);
-      setTimeout(() => setUploadSuccess(null), 5000);
     } catch (err: unknown) {
       setUploadError(err instanceof Error ? err.message : "Upload failed");
     }
@@ -214,12 +211,6 @@ export default function DocumentsPage() {
             <div className="alert alert-error animate-fade-in">
               <span>⚠️</span>
               <span>{uploadError}</span>
-            </div>
-          )}
-          {uploadSuccess && (
-            <div className="alert alert-success animate-fade-in">
-              <span>✅</span>
-              <span>{uploadSuccess}</span>
             </div>
           )}
           {error && (

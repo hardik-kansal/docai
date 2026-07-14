@@ -13,7 +13,7 @@ import { useQuery } from "@/hooks/useQuery";
 import { useDocuments } from "@/hooks/useDocuments";
 import type {
   ChatMessage,
-  Citation,
+  ContextChunk,
   UsageStats,
   DocumentResponse,
   DocumentStatus,
@@ -317,24 +317,33 @@ function ConfidenceMeter({ confidence }: { confidence: number }) {
   );
 }
 
-function CitationList({ citations }: { citations: Citation[] }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+function ContextList({ chunks, documents }: { chunks: ContextChunk[], documents: DocumentResponse[] }) {
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
   const [showAll, setShowAll] = useState(false);
-  if (citations.length === 0) return null;
+  if (chunks.length === 0) return null;
 
   const displayLimit = 2;
-  const visibleCitations = showAll ? citations : citations.slice(0, displayLimit);
-  const hiddenCount = citations.length - displayLimit;
+  const visibleChunks = showAll ? chunks : chunks.slice(0, displayLimit);
+  const hiddenCount = chunks.length - displayLimit;
 
   return (
     <div className="citations-section">
-      <div className="citations-header">📎 Sources ({citations.length})</div>
-      {visibleCitations.map((c) => {
-        const open = expanded.has(c.chunk_id);
+      <div className="citations-header">📎 Sources ({chunks.length})</div>
+      {visibleChunks.map((c, idx) => {
+        const docName = documents.find((d) => d.id === c.document_id)?.filename ?? "Unknown Document";
+        const open = expanded.has(idx);
         return (
-          <div key={c.chunk_id} className="citation-card" onClick={() => setExpanded((prev) => { const next = new Set(prev); open ? next.delete(c.chunk_id) : next.add(c.chunk_id); return next; })}>
-            <div className="citation-id">Chunk #{c.chunk_id}</div>
-            <div style={{ maxHeight: open ? "200px" : "2.8em", overflow: "hidden", transition: "max-height 0.3s ease", lineHeight: 1.6 }}>{c.quote}</div>
+          <div key={`${c.document_id}-${idx}`} className="citation-card" onClick={() => setExpanded((prev) => { const next = new Set(prev); open ? next.delete(idx) : next.add(idx); return next; })}>
+            <div className="citation-id">Citation {idx}</div>
+            <div style={{ maxHeight: open ? "400px" : "0px", overflow: "hidden", transition: "max-height 0.3s ease", lineHeight: 1.6, opacity: open ? 1 : 0 }}>
+              <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: "8px", background: "var(--bg-base)", padding: "4px 8px", borderRadius: "4px" }}>
+                <div><strong>Document:</strong> {docName}</div>
+                <div><strong>Chunk Index:</strong> {c.chunk_index}</div>
+                <div><strong>Page No:</strong> {c.page_numbers?.join(", ") ?? "N/A"}</div>
+              </div>
+              <div style={{ fontSize: "0.85rem", whiteSpace: "pre-wrap" }}>{c.contextualized_text}</div>
+            </div>
+            {!open && <div style={{ fontSize: "0.85rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.contextualized_text.substring(0, 100)}...</div>}
             <div style={{ fontSize: "0.68rem", color: "var(--text-muted)", marginTop: 3 }}>{open ? "▲ Collapse" : "▼ Expand"}</div>
           </div>
         );
@@ -378,7 +387,7 @@ function UsageBar({ usage }: { usage: UsageStats }) {
   );
 }
 
-function AssistantMessage({ msg }: { msg: ChatMessage }) {
+function AssistantMessage({ msg, documents }: { msg: ChatMessage, documents: DocumentResponse[] }) {
   return (
     <div className="message-bubble assistant">
       <div className="message-avatar">🤖</div>
@@ -395,17 +404,17 @@ function AssistantMessage({ msg }: { msg: ChatMessage }) {
           {msg.groundedAnswer?.abstained && msg.groundedAnswer.abstain_reason && (
             <div className="abstain-notice"><div style={{ flex: 1 }}>⚠️ {msg.groundedAnswer.abstain_reason}</div></div>
           )}
-          {msg.groundedAnswer && !msg.groundedAnswer.abstained && (!msg.groundedAnswer.citations || msg.groundedAnswer.citations.length === 0) && (
+          {msg.groundedAnswer && !msg.groundedAnswer.abstained && (!msg.contextChunks || msg.contextChunks.length === 0) && (
             <ConfidenceMeter confidence={msg.groundedAnswer.confidence} />
           )}
           {msg.usage && <UsageBar usage={msg.usage} />}
           {msg.error && <div className="alert alert-error" style={{ fontSize: "0.8rem" }}><span>⚠️</span><span>{msg.error}</span></div>}
           <div className="message-time">{msg.timestamp.toLocaleTimeString()}</div>
         </div>
-        {msg.groundedAnswer?.citations && msg.groundedAnswer.citations.length > 0 && (
+        {msg.contextChunks && msg.contextChunks.length > 0 && (
           <div style={{ width: "320px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
-            <ConfidenceMeter confidence={msg.groundedAnswer.confidence} />
-            <CitationList citations={msg.groundedAnswer.citations} />
+            {msg.groundedAnswer && <ConfidenceMeter confidence={msg.groundedAnswer.confidence} />}
+            <ContextList chunks={msg.contextChunks} documents={documents} />
           </div>
         )}
       </div>
@@ -519,6 +528,10 @@ function QueryPageInner() {
 
   const handleFileSelect = useCallback(async (file: File) => {
     setUploadMsg(null);
+    if (documents.some((d) => d.filename === file.name)) {
+      setUploadMsg({ type: "error", text: "Filename already exists." });
+      return;
+    }
     try {
       await uploadFile(file);
       setUploadMsg({ type: "success", text: `"${file.name}" uploaded — processing…` });
@@ -619,7 +632,7 @@ function QueryPageInner() {
                 msg.role === "user" ? (
                   <UserMessage key={msg.id} msg={msg} />
                 ) : (
-                  <AssistantMessage key={msg.id} msg={msg} />
+                  <AssistantMessage key={msg.id} msg={msg} documents={documents} />
                 )
               )}
               <div ref={bottomRef} />

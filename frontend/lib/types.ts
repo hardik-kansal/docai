@@ -58,9 +58,11 @@ export interface ViewURLResponse {
 
 // ─── Query / LLM Output ─────────────────────────────────────────────────────
 
-export interface Citation {
-  chunk_id: string;
-  quote: string;
+export interface ContextChunk {
+  document_id: string;
+  chunk_index: number;
+  page_numbers: number[];
+  contextualized_text: string;
 }
 
 export type AbstainReason =
@@ -72,7 +74,6 @@ export type AbstainReason =
 
 export interface GroundedAnswer {
   answer: string;
-  citations: Citation[];
   confidence: number;
   abstained: boolean;
   abstain_reason: AbstainReason;
@@ -92,6 +93,7 @@ export type StreamEvent =
   | { type: "thought"; content: string }
   | { type: "structured_json_data"; content: string }
   | { type: "usage"; content: UsageStats }
+  | { type: "context"; content: ContextChunk[] }
   | { type: "error"; content: string };
 
 // ─── Query Request ───────────────────────────────────────────────────────────
@@ -112,6 +114,7 @@ export interface ChatMessage {
   timestamp: Date;
   // assistant-only
   groundedAnswer?: GroundedAnswer;
+  contextChunks?: ContextChunk[];
   usage?: UsageStats;
   thoughts?: string;
   isStreaming?: boolean;

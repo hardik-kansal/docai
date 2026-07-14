@@ -2,11 +2,6 @@ from pydantic import BaseModel, Field
 from enum import StrEnum
 
 
-class Citation(BaseModel):
-    chunk_id: str
-    quote: str  # short excerpt from that chunk supporting the claim
-
-
 class AbstainReason(StrEnum):
     NONE = "none"
     INPUT_REJECTED = "input_rejected"  # injection/moderation blocked the request
@@ -19,7 +14,6 @@ class AbstainReason(StrEnum):
 
 class GroundedAnswer(BaseModel):
     answer: str
-    citations: list[Citation]
     confidence: float = Field(ge=0.0, le=1.0)
     abstained: bool
     abstain_reason: AbstainReason = AbstainReason.NONE

@@ -3,7 +3,7 @@ from ..models.schemas import PLANS, PlanType
 import logging
 import json
 from fastapi import APIRouter, Depends, Request
-from urllib.parse import unquote
+from urllib.parse import unquote_plus
 from ..config import settings
 from ..models.document import PresignedURLResponse, DocumentResponse
 
@@ -106,8 +106,9 @@ async def minio_webhook(
 
         s3_info = record.get("s3", {})
         bucket = s3_info.get("bucket", {}).get("name", None)
-        obj_key = unquote(s3_info.get("object", {}).get("key", None))
+        obj_key = unquote_plus(s3_info.get("object", {}).get("key", None))
         # uploads%2Fuser_id%2Fuuid%2Ffilename -> unquote url decode the string
+        # converts + to spaces
 
         obj_size = s3_info.get("object", {}).get("size", 0)
         # if obj_size > settings.max_file_size_bytes:

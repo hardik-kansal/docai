@@ -22,6 +22,7 @@ export interface StreamCallbacks {
   onJsonChunk?: (chunk: string) => void;
   onUsage?: (usage: import("./types").UsageStats) => void;
   onError?: (msg: string) => void;
+  onContext?: (chunks: import("./types").ContextChunk[]) => void;
   onComplete?: (answer: GroundedAnswer | null) => void;
 }
 
@@ -89,6 +90,10 @@ export async function parseStream(
 
             case "usage":
               callbacks.onUsage?.(event.content);
+              break;
+
+            case "context":
+              callbacks.onContext?.(event.content);
               break;
 
             case "error":
