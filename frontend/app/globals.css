@@ -721,45 +721,163 @@ a:hover {
 
 /* ─── Auth layout ────────────────────────────────────────────────────────── */
 .auth-page {
-  min-height: 100vh;
   display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
-.auth-brand {
-  flex: 0 0 40%;
-  background: linear-gradient(160deg, var(--rose-50) 0%, rgb(255, 248, 244) 100%);
-  border-right: 1px solid var(--border-subtle);
+/* ─── Hero Section (100vh) ────────────────────────────────────────────────── */
+.auth-hero {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: #000000;
+}
+
+.auth-hero-brand {
+  flex: 0 0 75%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 60px 8%;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  z-index: 1;
+}
+
+@keyframes fadeUpText {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.auth-hero-brand > div {
+  animation: fadeUpText 1s ease-out forwards;
+}
+
+.auth-hero-form {
+  flex: 0 0 25%;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 24px;
+  position: relative;
+  z-index: 10;
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Diagram Section (Below) ─────────────────────────────────────────────── */
+.auth-diagram-section {
+  width: 100%;
+  background: #ffffff;
+  padding: 140px 20px 100px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px 48px;
   position: relative;
-  overflow: hidden;
+  z-index: 2;
+  box-shadow: 0 -20px 60px rgba(0, 0, 0, 0.1);
 }
 
-.auth-brand::before {
-  content: "";
-  position: absolute;
-  width: 420px;
-  height: 420px;
-  border-radius: 50%;
-  background: radial-gradient(ellipse, rgba(201, 75, 107, 0.1) 0%, transparent 70%);
-  top: -80px;
-  right: -80px;
-  pointer-events: none;
+@keyframes slideInFade {
+  0% { opacity: 0; transform: translateX(-20px); }
+  100% { opacity: 1; transform: translateX(0); }
 }
 
-/* ── WIDER form panel ─────────────────────────────────────────────────────── */
-.auth-form-panel {
-  flex: 0 0 60%;
+@keyframes floatDiagram {
+  0% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-15px) scale(1.01); }
+  100% { transform: translateY(0px) scale(1); }
+}
+
+.arch-diagram {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0,0,0,0.05);
+  animation: slideInFade 1.2s ease-out forwards, floatDiagram 8s ease-in-out infinite 1.2s;
+  transition: transform 0.4s ease, box-shadow 0.4s ease;
+  cursor: pointer;
+}
+
+.arch-diagram:hover {
+  transform: scale(1.03) translateY(-5px);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  animation-play-state: paused;
+}
+
+.diagram-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #111;
+  margin-bottom: 16px;
+}
+
+.diagram-subtitle {
+  font-size: 1.1rem;
+  color: #555;
+  margin-bottom: 60px;
+  max-width: 600px;
+  text-align: center;
+}
+
+/* ─── Footer Section ──────────────────────────────────────────────────────── */
+.auth-footer {
+  width: 100%;
+  background: #000000;
+  color: #ffffff;
+  padding: 80px 20px 60px;
   display: flex;
   flex-direction: column;
+  align-items: center;
   justify-content: center;
-  align-items: flex-end;
-  padding: 70px 10vw;
-  background: var(--bg-base);
-  overflow-y: auto;
+  text-align: center;
+  position: relative;
+  z-index: 5;
+}
+
+.auth-footer-socials {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 40px;
+}
+
+.auth-footer-socials a {
+  color: #aaaaaa;
+  font-size: 1.2rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border: 1px solid #333;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.05);
+}
+
+.auth-footer-socials a:hover {
+  transform: translateY(-5px);
+  color: #ffffff;
+  border-color: #666;
+  background: rgba(255,255,255,0.1);
+  box-shadow: 0 10px 20px rgba(255,255,255,0.05);
+}
+
+.auth-footer-text {
+  color: #888888;
+  font-size: 1rem;
+  max-width: 700px;
+  line-height: 1.8;
+}
+
+.auth-footer-highlight {
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .auth-form {

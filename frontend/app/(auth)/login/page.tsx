@@ -38,163 +38,125 @@ export default function LoginPage() {
 
   return (
     <main className="auth-page">
-      {/* ── Left brand panel ── */}
-      <div className="auth-brand">
-        <div style={{ position: "relative", zIndex: 1, textAlign: "center", maxWidth: 340 }}>
-          {/* Folder icon inspired logo */}
-          <div style={{ position: "relative", width: 100, height: 84, margin: "0 auto 32px" }}>
-            {/* folder tab */}
-            <div
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: 52,
-                height: 22,
-                background: "var(--rose-500)",
-                borderRadius: "8px 10px 0 0",
-              }}
-            />
-            {/* folder body */}
-            <div
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 68,
-                background: "var(--rose-400)",
-                borderRadius: "0 10px 10px 10px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 6px 20px rgba(201,75,107,0.35)",
-              }}
-            >
-              <span style={{ fontSize: "1.8rem" }}>🧠</span>
-            </div>
-          </div>
-
-          <h1 style={{ marginBottom: 12 }}>
-            <span className="gradient-text">Nexus AI</span>
-          </h1>
-          <p style={{ color: "var(--text-secondary)", lineHeight: 1.75, fontSize: "0.95rem", marginBottom: 36 }}>
-            Ask questions about your documents and get grounded answers with citations.
-          </p>
-
-          {/* Feature list */}
-          {[
-            { icon: "🔍", label: "Hybrid semantic search" },
-            { icon: "📌", label: "Citation-level grounding" },
-            { icon: "⚡", label: "Streaming answers" },
-            { icon: "🛡️", label: "PII redaction & guardrails" },
-          ].map((f) => (
-            <div
-              key={f.label}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                padding: "10px 14px",
-                background: "rgba(255,255,255,0.7)",
-                borderRadius: "var(--radius-md)",
-                border: "1px solid var(--border-subtle)",
-                textAlign: "left",
-                marginBottom: 8,
-              }}
-            >
-              <span>{f.icon}</span>
-              <span style={{ fontSize: "0.85rem", color: "var(--text-secondary)", fontWeight: 500 }}>{f.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Right WIDER form panel ── */}
-      <div className="auth-form-panel">
-        <div style={{ maxWidth: 480, width: "100%" }}>
-          <div style={{ marginBottom: 40 }}>
-            <div
-              style={{
-                width: 44,
-                height: 44,
-                background: "var(--rose-500)",
-                borderRadius: "var(--radius-lg)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "1.3rem",
-                marginBottom: 22,
-                boxShadow: "var(--shadow-accent)",
-              }}
-            >
-              🔑
-            </div>
-            <h2 style={{ marginBottom: 6 }}>Welcome back</h2>
-            <p style={{ fontSize: "0.9rem", color: "var(--text-muted)" }}>
-              Sign in to your account to continue
+      <section className="auth-hero">
+        {/* ── Left brand panel ── */}
+        <div className="auth-hero-brand">
+          <div style={{ position: "relative", zIndex: 1, textAlign: "center", width: "100%", maxWidth: 650, margin: "0 auto" }}>
+            <h1 style={{ marginBottom: 12, color: "#ffffff", fontSize: "3rem", fontWeight: 800, letterSpacing: "-0.02em" }}>
+              Nexus AI
+            </h1>
+            <p style={{ color: "#dddddd", lineHeight: 1.75, fontSize: "1.1rem", marginBottom: 40, fontWeight: 500 }}>
+              Intelligent Document Processing Pipeline
             </p>
           </div>
+        </div>
 
-          <form className="auth-form" onSubmit={handleSubmit} id="login-form">
-            {displayError && (
-              <div className="alert alert-error animate-fade-in">
-                <span>⚠️</span><span>{displayError}</span>
+        {/* ── Right WIDER form panel ── */}
+        <div className="auth-hero-form">
+          <div style={{ maxWidth: 480, width: "100%" }}>
+            <div style={{ marginBottom: 40 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  background: "var(--rose-500)",
+                  borderRadius: "var(--radius-lg)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "1.3rem",
+                  marginBottom: 22,
+                  boxShadow: "var(--shadow-accent)",
+                }}
+              >
+                🔑
               </div>
-            )}
-
-            <div className="input-group">
-              <label className="input-label" htmlFor="login-username">Username</label>
-              <input
-                id="login-username"
-                className={`input ${displayError ? "input-error" : ""}`}
-                type="text"
-                placeholder="Enter your username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                maxLength={10}
-                autoComplete="username"
-                autoFocus
-                disabled={submitting}
-              />
+              <h2 style={{ marginBottom: 6 }}>Welcome back</h2>
+              <p style={{ fontSize: "0.9rem", color: "var(--text-muted)" }}>
+                Sign in to your account to continue
+              </p>
             </div>
 
-            <div className="input-group">
-              <label className="input-label" htmlFor="login-pwd">Password</label>
-              <input
-                id="login-pwd"
-                className={`input ${displayError ? "input-error" : ""}`}
-                type="password"
-                placeholder="Enter your password"
-                value={pwd}
-                onChange={(e) => setPwd(e.target.value)}
-                maxLength={10}
-                autoComplete="current-password"
-                disabled={submitting}
-              />
-            </div>
+            <form className="auth-form" onSubmit={handleSubmit} id="login-form">
+              {displayError && (
+                <div className="alert alert-error animate-fade-in">
+                  <span>⚠️</span><span>{displayError}</span>
+                </div>
+              )}
 
-            <button
-              id="login-submit"
-              type="submit"
-              className="btn btn-primary btn-lg w-full"
-              disabled={submitting || loading}
-              style={{ marginTop: 4 }}
-            >
-              {submitting ? (
-                <><div className="spinner spinner-sm" style={{ borderTopColor: "white" }} /> Signing in…</>
-              ) : "Sign In →"}
-            </button>
+              <div className="input-group">
+                <label className="input-label" htmlFor="login-username">Username</label>
+                <input
+                  id="login-username"
+                  className={`input ${displayError ? "input-error" : ""}`}
+                  type="text"
+                  placeholder="Enter your username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  maxLength={10}
+                  autoComplete="username"
+                  autoFocus
+                  disabled={submitting}
+                />
+              </div>
 
-            <p style={{ textAlign: "center", fontSize: "0.875rem", color: "var(--text-muted)" }}>
-              Don&apos;t have an account?{" "}
-              <Link href="/signup" style={{ color: "var(--rose-600)", fontWeight: 600 }}>
-                Create one
-              </Link>
-            </p>
-          </form>
+              <div className="input-group">
+                <label className="input-label" htmlFor="login-pwd">Password</label>
+                <input
+                  id="login-pwd"
+                  className={`input ${displayError ? "input-error" : ""}`}
+                  type="password"
+                  placeholder="Enter your password"
+                  value={pwd}
+                  onChange={(e) => setPwd(e.target.value)}
+                  maxLength={10}
+                  autoComplete="current-password"
+                  disabled={submitting}
+                />
+              </div>
+
+              <button
+                id="login-submit"
+                type="submit"
+                className="btn btn-primary btn-lg w-full"
+                disabled={submitting || loading}
+                style={{ marginTop: 4 }}
+              >
+                {submitting ? (
+                  <><div className="spinner spinner-sm" style={{ borderTopColor: "white" }} /> Signing in…</>
+                ) : "Sign In →"}
+              </button>
+
+              <p style={{ textAlign: "center", fontSize: "0.875rem", color: "var(--text-muted)" }}>
+                Don&apos;t have an account?{" "}
+                <Link href="/signup" style={{ color: "var(--rose-600)", fontWeight: 600 }}>
+                  Create one
+                </Link>
+              </p>
+            </form>
+          </div>
         </div>
-      </div>
+      </section>
+
+      <section className="auth-diagram-section">
+        <h2 className="diagram-title">System Architecture</h2>
+        <p className="diagram-subtitle">
+          A high-level overview of our scalable data ingestion and processing pipeline.
+        </p>
+        <img src="/bg.png" alt="Architecture Diagram" className="arch-diagram" />
+      </section>
+
+      <footer className="auth-footer">
+        <div className="auth-footer-socials">
+          <a href="https://instagram.com" target="_blank" rel="noreferrer">📷 Instagram</a>
+          <a href="https://github.com" target="_blank" rel="noreferrer">🐙 GitHub</a>
+          <a href="https://linkedin.com" target="_blank" rel="noreferrer">💼 LinkedIn</a>
+        </div>
+        <p className="auth-footer-text">
+          <span className="auth-footer-highlight">Frontend</span> crafted with <span className="auth-footer-highlight">Agentic AI</span> ⚡<br/>
+          <span className="auth-footer-highlight">Backend</span> built entirely from scratch by developer (without AI) 💻
+        </p>
+      </footer>
     </main>
   );
 }
