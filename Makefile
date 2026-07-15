@@ -29,6 +29,7 @@ celery-start:
 # -l info for logging to show
 # --concurrency=4, creates 4 differnt seperate proccess, like 4 new applications
 
+# lsof -t -i:8000 to get pids at 8000
 
 start:
 	@kill -9 $$(lsof -t -i:8000) 2>/dev/null || true

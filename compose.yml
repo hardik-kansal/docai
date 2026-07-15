@@ -58,13 +58,6 @@ services:
       - "6333:6333" 
     volumes:
       - qdrant_data:/qdrant/storage
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:6333/readyz || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-
     
   minio:
     image: minio/minio:latest
@@ -105,7 +98,7 @@ services:
       redis:
         condition: service_healthy
       qdrant:
-        condition: service_healthy
+        condition: service_started
 
     healthcheck:
       disable: true
@@ -116,3 +109,20 @@ volumes:
   minio_data:
   qdrant_data:
 
+
+# volumes-
+
+#   mounting means create a folder which now points to 
+#   a folder which is created and used inside a container,
+#   so if that conatainer stops, that folder is not deleted.
+
+#   - path -> mount to this path of container directory, 
+#   and docker creates a random volume name which manages a folder 
+#   poiting to that path
+
+#   - system path:container path tell docker the folder which exits on our system 
+#   (if doesnt creates it) and mount this folder to container path
+
+#   - volume name:path but add volume at last of compose file, 
+#   means create a volumne with this name, 
+#   and which mangaes a folder which points to folder used inside container
