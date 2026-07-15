@@ -15,9 +15,6 @@ class Settings(BaseSettings):
     is_prod: bool  # "false converts to 0"
 
     # MinIO / S3
-    minio_endpoint: str
-    minio_access_key: str
-    minio_secret_key: str
     minio_bucket: str
     minio_region: str
     MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_FASTAPI: str

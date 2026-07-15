@@ -109,9 +109,6 @@ but share same filesystem -> not idompotent
 def init_worker_s3(**kwargs):
     client = boto3.client(
         "s3",
-        endpoint_url=settings().minio_endpoint,
-        aws_access_key_id=settings().minio_access_key,
-        aws_secret_access_key=settings().minio_secret_key,
         region_name=settings().minio_region,
         config=Config(retries={"max_attempts": 3, "mode": "adaptive"}),
     )
