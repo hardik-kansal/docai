@@ -30,6 +30,7 @@ dependencies = [
     "torch",
     "torchvision",
     "opencv-python-headless",
+    "logfire[asyncpg,celery,fastapi,httpx,redis]>=4.37.0",
 ]
 
 [tool.uv]
@@ -49,7 +50,6 @@ dev = [
     "sentencepiece>=0.2.1",
     "tokenizers>=0.22.2",
     "transformers>=4.57.6",
-    "logfire[asyncpg,celery,fastapi,httpx,redis]>=4.37.0",
 ]
 [[tool.uv.index]]
 name = "pytorch-cpu"
