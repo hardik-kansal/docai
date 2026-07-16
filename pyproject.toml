@@ -1,7 +1,7 @@
 [project]
-name = "project1"
+name = "docai-backend"
 version = "0.1.0"
-description = "Add your description here"
+description = "rag for docs"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -12,12 +12,9 @@ dependencies = [
     "boto3>=1.43.36",
     "celery>=5.6.3",
     "docling>=2.110.0",
-    "docling-core",
-    "en-core-web-md",
     "fastapi[standard]>=0.137.1",
     "fastembed>=0.8.0",
     "google-genai>=2.10.0",
-    "logfire[asyncpg,celery,fastapi,httpx,redis]>=4.37.0",
     "make>=0.1.6.post2",
     "presidio-analyzer>=2.2.363",
     "presidio-anonymizer>=2.2.363",
@@ -30,6 +27,14 @@ dependencies = [
     "requests>=2.34.2",
     "sse-starlette>=3.4.5",
     "tenacity>=9.1.4",
+    "torch",
+    "torchvision",
+    "opencv-python-headless",
+]
+
+[tool.uv]
+override-dependencies = [
+    "opencv-python; python_version < '0'"
 ]
 
 [dependency-groups]
@@ -44,6 +49,7 @@ dev = [
     "sentencepiece>=0.2.1",
     "tokenizers>=0.22.2",
     "transformers>=4.57.6",
+    "logfire[asyncpg,celery,fastapi,httpx,redis]>=4.37.0",
 ]
 [[tool.uv.index]]
 name = "pytorch-cpu"
@@ -53,7 +59,7 @@ explicit = true
 [tool.uv.sources]
 torch = { index = "pytorch-cpu" }
 torchvision = { index = "pytorch-cpu" }
-en-core-web-md = { url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_md-3.8.0/en_core_web_md-3.8.0-py3-none-any.whl" }
+
 
 
 

@@ -29,11 +29,7 @@ services:
       start_period: 5s
 
   api:
-    build:
-    # either build or look for image to pull
-    # if build, then first check cache if already build in another service
-      context: .
-      target: runner
+    image: hardikkansal/docai-api:latest
     container_name: api
     restart: unless-stopped
     env_file:
@@ -45,9 +41,7 @@ services:
       disable: true
 
   celery:
-    build:
-      context: .
-      target: runner
+    image: hardikkansal/docai-api:latest
     container_name: celery
     restart: unless-stopped
     env_file:
@@ -58,8 +52,7 @@ services:
         condition: service_healthy
 
   frontend:
-    build:
-      context: ./frontend
+    image: hardikkansal/docai-frontend:latest
     container_name: frontend
     restart: unless-stopped
     env_file:
