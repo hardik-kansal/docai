@@ -29,7 +29,7 @@ services:
       start_period: 5s
 
   api:
-    image: hardikkansal/docai-api:latest
+    image: hardikkansal/docai-api:v1
     container_name: api
     restart: unless-stopped
     env_file:
@@ -41,7 +41,7 @@ services:
       disable: true
 
   celery:
-    image: hardikkansal/docai-api:latest
+    image: hardikkansal/docai-api:v1
     container_name: celery
     restart: unless-stopped
     env_file:
@@ -52,7 +52,7 @@ services:
         condition: service_healthy
 
   frontend:
-    image: hardikkansal/docai-frontend:latest
+    image: hardikkansal/docai-frontend:v1
     container_name: frontend
     restart: unless-stopped
     env_file:
