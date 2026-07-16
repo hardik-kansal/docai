@@ -78,7 +78,11 @@ def process_document_task(
     embedding_dim: int,
 ):
     # it downloads in chunks efficiently, to avoid consuming ram
-    local_path = f"{self.request.id}.pdf"
+    local_path = f"/tmp/{self.request.id}.pdf"
+    # tmp is very imp, on this system we are root,
+    # when deploying docker is not root so wrting directly
+    # if docker used /tmp, then its mounted
+    # tmp is writable for both root/non-root users
 
     # This is synchronous (blocking). boto3 is sync lib
     get_boto3_client().download_file(
