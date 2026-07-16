@@ -117,7 +117,7 @@ async def minio_webhook(
     records = payload.get("Records", [])
 
     # AWS EventBridge format support
-    if settings().is_prod:
+    if settings.is_prod:
         if "detail-type" in payload and payload.get("source") == "aws.s3":
             bucket_name = payload.get("detail", {}).get("bucket", {}).get("name")
             object_key = payload.get("detail", {}).get("object", {}).get("key")
