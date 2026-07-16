@@ -116,6 +116,21 @@ async def minio_webhook(
     # MinIO sends Records array — process each (usually 1 per webhook)
     records = payload.get("Records", [])
 
+    # AWS EventBridge format support
+    if "detail-type" in payload and payload.get("source") == "aws.s3":
+        bucket_name = payload.get("detail", {}).get("bucket", {}).get("name")
+        object_key = payload.get("detail", {}).get("object", {}).get("key")
+        object_size = payload.get("detail", {}).get("object", {}).get("size", 0)
+
+        records = [
+            {
+                "eventName": "ObjectCreated:Put",
+                "s3": {
+                    "bucket": {"name": bucket_name},
+                    "object": {"key": object_key, "size": object_size},
+                },
+            }
+        ]
     for record in records:
         event_name: str = record.get("eventName", "")
         if "ObjectCreated" not in event_name:
