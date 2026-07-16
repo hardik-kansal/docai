@@ -1,5 +1,5 @@
 [project]
-name = "docai-backend"
+name = "project1"
 version = "0.1.0"
 description = "rag for docs"
 readme = "README.md"
