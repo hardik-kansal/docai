@@ -35,6 +35,9 @@ start:
 	@kill -9 $$(lsof -t -i:8000) 2>/dev/null || true
 	uv run fastapi dev backend/main.py
 
+frontend-start:
+	cd frontend && npm install && npm run dev
+
 upload:
 	 uv run python tests/upload_s3.py
 
