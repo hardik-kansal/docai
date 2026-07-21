@@ -20,7 +20,7 @@ minio-hook:
 
 #rm -rf /tmp/fastembed_cache/ use this when using a diff embedding model
 celery-start:
-	AWS_ACCESS_KEY_ID=hardik AWS_SECRET_ACCESS_KEY=password uv run celery -A backend.ingestion.worker.celery_app worker -E -Q ingestion -l info --concurrency=4
+	AWS_ACCESS_KEY_ID=hardik AWS_SECRET_ACCESS_KEY=password AWS_ENDPOINT_URL_S3=http://localhost:9000 uv run celery -A backend.ingestion.worker.celery_app worker -E -Q ingestion -l info --concurrency=4
 
 # -A is for application, 
 # worker is just role
@@ -34,7 +34,7 @@ celery-start:
 # in prod, these will be added through iam role
 start:
 	@kill -9 $$(lsof -t -i:8000) 2>/dev/null || true
-	AWS_ACCESS_KEY_ID=hardik AWS_SECRET_ACCESS_KEY=password uv run fastapi dev backend/main.py
+	AWS_ACCESS_KEY_ID=hardik AWS_SECRET_ACCESS_KEY=password AWS_ENDPOINT_URL_S3=http://localhost:9000 uv run fastapi dev backend/main.py
 
 frontend-start:
 	cd frontend && npm install && npm run dev

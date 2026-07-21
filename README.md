@@ -150,7 +150,7 @@ docker push <your-dockerhub-username>/docai-frontend:v1
    - All `server_name` entries to match your custom domain.
 3. Run the initialization script to request Let's Encrypt certificates and configure Nginx:
    ```bash
-   chmod +x init-letsencrypt.sh
+   sudo chmod +x init-letsencrypt.sh
    sudo ./init-letsencrypt.sh
    ```
 
