@@ -270,7 +270,7 @@ async def lifespan(app: FastAPI):
         raise
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, docs_url=None)
 app.include_router(auth_router)
 app.include_router(s3_router)
 app.include_router(query_router)
@@ -292,3 +292,10 @@ async def guardrail_exception_handler(request: Request, exc: GroundedJsonExcepti
 @app.get("/")
 async def home(user: Annotated[User, Depends(get_current_user)]):
     return user
+
+
+@app.get("/docs")
+async def docs_redirect():
+    from fastapi.responses import RedirectResponse
+
+    return RedirectResponse(url="https://github.com/hardik-kansal/docai#readme")

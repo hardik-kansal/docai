@@ -28,7 +28,14 @@ Check aws deployment at [docai.codes](https://docai.codes)
 *   [Node.js (v18+)](https://nodejs.org/) & [NPM](https://www.npmjs.com/)
 *   [GNU Make](https://www.gnu.org/software/make/) (or run directly)
 
-### Step 1: Spin up Local Databases & Storage
+### Step 1: Configure Google OAuth
+Before starting the application, you must configure Google OAuth:
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/).
+2. Create OAuth 2.0 Client IDs for a Web Application.
+3. Add `http://localhost:8000/api/v1/auth/login/google/callback` as an **Authorized redirect URI**.
+4. Copy your Client ID and Client Secret into your `.env` file under `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+
+### Step 2: Spin up Local Databases & Storage
 Launch PostgreSQL, Redis, Qdrant, and MinIO in background detached mode:
 ```bash
 make docker-start
@@ -40,32 +47,31 @@ Once started, the following services and dashboards will be accessible:
 *   **Qdrant**: API Port `6333` | Dashboard UI: [http://localhost:6333/dashboard](http://localhost:6333/dashboard)
 *   **MinIO**: API Port `9000` | Console/Dashboard UI: [http://localhost:9001](http://localhost:9001)
 
-### Step 2: Configure MinIO Event Notification
+### Step 3: Configure MinIO Event Notification
 Hook MinIO storage bucket events to FastAPI webhook endpoint:
 ```bash
 make minio-hook
 ```
 
-### Step 3: Run Database Migrations
+### Step 4: Run Database Migrations
 Create/update tables in PostgreSQL:
 ```bash
 uv run alembic upgrade head
 ```
 
-### Step 4: Run Celery Worker
+### Step 5: Run Celery Worker
 Launch the background task processor queue:
 ```bash
 make celery-start
 ```
 
-### Step 5: Start FastAPI API Server
+### Step 6: Start FastAPI API Server
 Start the Uvicorn/FastAPI backend:
 ```bash
 make start
 ```
-API docs are accessible at [http://localhost:8000/docs](http://localhost:8000/docs).
 
-### Step 6: Start Next.js Frontend
+### Step 7: Start Next.js Frontend
 Start the Next.js development server:
 ```bash
 make frontend-start

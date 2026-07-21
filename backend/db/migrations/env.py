@@ -1,9 +1,9 @@
-import sys
-import os
+# import sys
+# import os
 
 # python loads module hiearchy on loading only, so relative path doesnt work,
 # does not require in production, since we used docker
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
+# sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 from backend.config import settings
 
 from logging.config import fileConfig
