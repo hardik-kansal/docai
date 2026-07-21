@@ -150,6 +150,7 @@ docker push <your-dockerhub-username>/docai-frontend:v1
    - All `server_name` entries to match your custom domain.
 3. Run the initialization script to request Let's Encrypt certificates and configure Nginx:
    ```bash
+   sudo rm -rf ./certbot
    sudo chmod +x init-letsencrypt.sh
    sudo ./init-letsencrypt.sh
    ```
@@ -163,7 +164,7 @@ docker compose -f compose.prod.yml up -d
 #### 6. Database Migrations
 Run Alembic migrations inside the API container to initialize the RDS database:
 ```bash
-docker compose -f compose.prod.yml exec api uv run alembic upgrade head
+docker compose -f compose.prod.yml exec api alembic upgrade head
 ```
 
 #### 7. AWS S3 IAM & CORS Configuration
