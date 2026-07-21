@@ -62,18 +62,24 @@ export function useDocuments() {
           return;
         }
 
-        if (data.object_key && data.status) {
-          setDocuments((currentDocs) =>
-            currentDocs.map((doc) =>
-              doc.s3_key === data.object_key || (data.document_id && doc.id === data.document_id)
-                ? { 
-                    ...doc, 
-                    status: data.status as DocumentResponse["status"],
-                    ...(data.document_id ? { id: data.document_id } : {})
-                  }
-                : doc
-            )
-          );
+        if ((data.object_key || data.document_id) && data.status) {
+          if (data.status === "deleted") {
+            setDocuments((currentDocs) =>
+              currentDocs.filter((doc) => doc.id !== data.document_id)
+            );
+          } else {
+            setDocuments((currentDocs) =>
+              currentDocs.map((doc) =>
+                (data.object_key && doc.s3_key === data.object_key) || (data.document_id && doc.id === data.document_id)
+                  ? { 
+                      ...doc, 
+                      status: data.status as DocumentResponse["status"],
+                      ...(data.document_id ? { id: data.document_id } : {})
+                    }
+                  : doc
+              )
+            );
+          }
         }
       } catch (err) {
         console.error("Failed to parse SSE message", err);
@@ -156,6 +162,25 @@ export function useDocuments() {
     []
   );
 
+  const deleteDocument = useCallback(
+    async (documentId: string): Promise<void> => {
+      // Optimistically update status
+      setDocuments((prev) =>
+        prev.map((doc) => (doc.id === documentId ? { ...doc, status: "deleting" } : doc))
+      );
+      try {
+        await ingestionApi.deleteDocument(documentId);
+      } catch (err) {
+        // Revert on error
+        const msg = err instanceof ApiError ? err.message : "Delete failed";
+        setError(msg);
+        fetchDocuments(); // Refetch to get correct state
+        throw err;
+      }
+    },
+    [fetchDocuments]
+  );
+
   return {
     documents,
     loading,
@@ -164,5 +189,6 @@ export function useDocuments() {
     fetchDocuments,
     uploadFile,
     getViewUrl,
+    deleteDocument,
   };
 }

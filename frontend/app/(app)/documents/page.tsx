@@ -20,6 +20,7 @@ function StatusBadge({ status }: { status: DocumentStatus }) {
     pending_embedding: { cls: "badge-processing", label: "🔄 Embedding" },
     ready: { cls: "badge-ready", label: "✅ Ready" },
     error: { cls: "badge-error", label: "❌ Error" },
+    deleting: { cls: "badge-error", label: "🗑️ Deleting" },
   };
   const conf = map[status] ?? map.pending;
   return <span className={`badge ${conf.cls}`}>{conf.label}</span>;
@@ -104,10 +105,12 @@ function DocCard({
   doc,
   onQuery,
   onView,
+  onDelete,
 }: {
   doc: DocumentResponse;
   onQuery: (id: string) => void;
   onView: (id: string) => void;
+  onDelete: (id: string) => void;
 }) {
   const [loadingView, setLoadingView] = useState(false);
   const handleView = async () => {
@@ -164,6 +167,24 @@ function DocCard({
         >
           💬 Query
         </button>
+        <button
+          id={`delete-doc-${doc.id}`}
+          className="btn btn-error btn-sm"
+          onClick={() => {
+            if (confirm("Are you sure you want to delete this document?")) {
+              onDelete(doc.id);
+            }
+          }}
+          disabled={doc.status === "deleting"}
+          title="Delete document"
+          style={{ 
+            background: "transparent", 
+            border: "1px solid rgba(239, 68, 68, 0.4)",
+            color: "#f87171" 
+          }}
+        >
+          🗑️
+        </button>
       </div>
     </div>
   );
@@ -176,6 +197,7 @@ export default function DocumentsPage() {
     uploading,
     uploadFile,
     getViewUrl,
+    deleteDocument,
   } = useDocuments();
   const router = useRouter();
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -268,6 +290,7 @@ export default function DocumentsPage() {
                   doc={doc}
                   onQuery={handleQuery}
                   onView={handleView}
+                  onDelete={deleteDocument}
                 />
               ))}
             </div>

@@ -32,7 +32,8 @@ export type DocumentStatus =
   | "chunking"
   | "ready"
   | "error"
-  | "pending_embedding";
+  | "pending_embedding"
+  | "deleting";
 
 export interface DocumentResponse {
   id: string;

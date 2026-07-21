@@ -253,6 +253,7 @@ def delete_document_task(
     doc_id: str,
     s3_bucket: str,
     s3_key: str,
+    user_id: str,
 ):
     async def _delete():
         # S3 delete operations are designed to be idempotent
@@ -296,6 +297,7 @@ def delete_document_task(
             raise
 
         message = {
+            "user_id": user_id,
             "document_id": doc_id,
             "status": "deleted",
         }

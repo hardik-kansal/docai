@@ -94,6 +94,12 @@ export const ingestionApi = {
     return apiFetch(`/api/v1/ingestion/documents/${documentId}/view-url`);
   },
 
+  deleteDocument(documentId: string): Promise<{ detail: string, document_id: string }> {
+    return apiFetch(`/api/v1/ingestion/documents/${documentId}`, {
+      method: "DELETE",
+    });
+  },
+
   /**
    * Upload a file directly to MinIO via presigned POST URL.
    * Returns HTTP status of the S3 upload response.

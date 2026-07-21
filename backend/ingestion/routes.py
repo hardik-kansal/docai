@@ -90,6 +90,7 @@ async def delete_document(
         doc_id=document_id,
         s3_bucket=settings.minio_bucket,
         s3_key=s3_key,
+        user_id=user.user_id,
     )
 
     return {"detail": "deletion in progress", "document_id": document_id}
