@@ -33,6 +33,7 @@ function StatusBadge({ status }: { status: DocumentStatus }) {
     pending_embedding: { cls: "badge-processing", label: "🔄 Embedding"  },
     ready:             { cls: "badge-ready",      label: "Active"      },
     error:             { cls: "badge-error",      label: "❌ Error"      },
+    deleting:          { cls: "badge-error",      label: "🗑️ Deleting"   },
   };
   const safeStatus = (status || "").toLowerCase() as DocumentStatus;
   const conf = map[safeStatus] ?? map.pending;
