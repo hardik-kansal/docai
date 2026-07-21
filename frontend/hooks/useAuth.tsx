@@ -10,8 +10,7 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (username: string, pwd: string) => Promise<void>;
-  signup: (username: string, pwd: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   refetch: () => Promise<void>;
   updateUser: (updates: Partial<UserProfile>) => void;
@@ -51,35 +50,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }));
   }, []);
 
-  const login = useCallback(
-    async (username: string, pwd: string): Promise<void> => {
+  const loginWithGoogle = useCallback(
+    async (): Promise<void> => {
       setState((s) => ({ ...s, loading: true, error: null }));
       try {
-        await authApi.login({ username, pwd });
-        await fetchMe();
+        const res = await authApi.getGoogleAuthUrl();
+        window.location.href = res.url;
       } catch (err) {
-        const msg = err instanceof ApiError ? err.message : "Login failed";
+        const msg = err instanceof ApiError ? err.message : "Failed to get auth URL";
         setState((s) => ({ ...s, loading: false, error: msg }));
         throw err;
       }
     },
-    [fetchMe]
-  );
-
-  const signup = useCallback(
-    async (username: string, pwd: string): Promise<void> => {
-      setState((s) => ({ ...s, loading: true, error: null }));
-      try {
-        await authApi.signup({ username, pwd });
-        await authApi.login({ username, pwd });
-        await fetchMe();
-      } catch (err) {
-        const msg = err instanceof ApiError ? err.message : "Signup failed";
-        setState((s) => ({ ...s, loading: false, error: msg }));
-        throw err;
-      }
-    },
-    [fetchMe]
+    []
   );
 
   const logout = useCallback(async (): Promise<void> => {
@@ -93,8 +76,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     ...state,
-    login,
-    signup,
+    loginWithGoogle,
     logout,
     refetch: fetchMe,
     updateUser,

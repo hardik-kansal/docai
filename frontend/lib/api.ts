@@ -54,18 +54,8 @@ export class ApiError extends Error {
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export const authApi = {
-  signup(creds: LoginRequest): Promise<SignupResponse> {
-    return apiFetch("/api/v1/auth/signup", {
-      method: "POST",
-      body: JSON.stringify(creds),
-    });
-  },
-
-  login(creds: LoginRequest): Promise<LoginResponse> {
-    return apiFetch("/api/v1/auth/login", {
-      method: "POST",
-      body: JSON.stringify(creds),
-    });
+  getGoogleAuthUrl(): Promise<{ url: string }> {
+    return apiFetch("/api/v1/auth/login/google");
   },
 
   logout(): Promise<{ message: string }> {

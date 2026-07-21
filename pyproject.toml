@@ -31,6 +31,8 @@ dependencies = [
     "torchvision",
     "opencv-python-headless",
     "logfire[asyncpg,celery,fastapi,httpx,redis]>=4.37.0",
+    "google-auth>=2.55.2",
+    "google-auth-oauthlib>=1.4.0",
 ]
 
 [tool.uv]

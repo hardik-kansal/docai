@@ -13,6 +13,12 @@ class Settings(BaseSettings):
     REDIS_URL: str
     DB_URL: str
     is_prod: bool  # "false converts to 0"
+    FRONTEND_URL: str
+
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str
+    GOOGLE_CLIENT_SECRET: str
+    GOOGLE_REDIRECT_URI: str
 
     # MinIO / S3
     minio_bucket: str

@@ -18,6 +18,7 @@ export interface LoginResponse {
 export interface UserProfile {
   user_id: string;
   username: string;
+  email: string;
   scopes: string[];
   plan_type: string;
   storage_used_bytes: number;

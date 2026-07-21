@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 class UserRow:
     user_id: str
     username: str
-    password_hash: str
+    email: str
+    google_sub: str
     scopes: list[AccessScope]
     plan_type: str
     storage_used_bytes: int  # python is dyamic,
@@ -32,24 +33,22 @@ class UserRepository:
     def __init__(self, pool: asyncpg.Pool) -> None:
         self._pool = pool
 
-    async def get_by_username(self, username: str) -> UserRow | None:
+    async def get_by_google_sub(self, google_sub: str) -> UserRow | None:
         row = await self._pool.fetchrow(
             """
-            SELECT user_id, username, password_hash, scopes, plan_type, storage_used_bytes, created_at
+            SELECT user_id, username, email, google_sub, scopes, plan_type, storage_used_bytes, created_at
             FROM users
-            WHERE username = $1
+            WHERE google_sub = $1
             """,
-            username,
+            google_sub,
         )
-        # asyncpg uses $1, $2... positional params (not %s).
-        # This is a true prepared statement — immune to SQL injection.
-        # Never use f-strings or .format() for query parameters.
         if row is None:
             return None
         return UserRow(
             user_id=row["user_id"].hex,
             username=row["username"],
-            password_hash=row["password_hash"],
+            email=row["email"],
+            google_sub=row["google_sub"],
             scopes=[AccessScope(s) for s in row["scopes"]],
             plan_type=row["plan_type"],
             storage_used_bytes=row["storage_used_bytes"],
@@ -59,25 +58,56 @@ class UserRepository:
     async def create(
         self,
         username: str,
-        password_hash: str,
+        email: str,
+        google_sub: str,
         scopes: list[AccessScope],
     ) -> UserRow:
         row = await self._pool.fetchrow(
             """
-            INSERT INTO users (username, password_hash, scopes)
-            VALUES ($1, $2, $3)
-            RETURNING user_id, username, password_hash, scopes, plan_type, storage_used_bytes, created_at
+            INSERT INTO users (username, email, google_sub, scopes)
+            VALUES ($1, $2, $3, $4)
+            RETURNING user_id, username, email, google_sub, scopes, plan_type, storage_used_bytes, created_at
             """,
             username,
-            password_hash,
+            email,
+            google_sub,
             [s.value for s in scopes],
         )
-        # RETURNING avoids a second SELECT — one round trip for insert + fetch.
-        # asyncpg maps Postgres array columns to Python lists automatically.
         return UserRow(
             user_id=row["user_id"].hex,
             username=row["username"],
-            password_hash=row["password_hash"],
+            email=row["email"],
+            google_sub=row["google_sub"],
+            scopes=[AccessScope(s) for s in row["scopes"]],
+            plan_type=row["plan_type"],
+            storage_used_bytes=row["storage_used_bytes"],
+            created_at=row["created_at"],
+        )
+
+    async def update_profile(
+        self,
+        user_id: int,
+        username: str,
+        email: str,
+    ) -> UserRow | None:
+        row = await self._pool.fetchrow(
+            """
+            UPDATE users
+            SET username = $2, email = $3
+            WHERE user_id = $1
+            RETURNING user_id, username, email, google_sub, scopes, plan_type, storage_used_bytes, created_at
+            """,
+            user_id,
+            username,
+            email,
+        )
+        if row is None:
+            return None
+        return UserRow(
+            user_id=row["user_id"].hex,
+            username=row["username"],
+            email=row["email"],
+            google_sub=row["google_sub"],
             scopes=[AccessScope(s) for s in row["scopes"]],
             plan_type=row["plan_type"],
             storage_used_bytes=row["storage_used_bytes"],
@@ -97,21 +127,19 @@ class UserRepository:
     async def get_by_user_id(self, user_id: int) -> UserRow | None:
         row = await self._pool.fetchrow(
             """
-            SELECT user_id, username, password_hash, scopes, plan_type, storage_used_bytes, created_at
+            SELECT user_id, username, email, google_sub, scopes, plan_type, storage_used_bytes, created_at
             FROM users
             WHERE user_id = $1
             """,
             user_id,
         )
-        # asyncpg uses $1, $2... positional params (not %s).
-        # This is a true prepared statement — immune to SQL injection.
-        # Never use f-strings or .format() for query parameters.
         if row is None:
             return None
         return UserRow(
-            user_id=row["user_id"].hex,  # afdf-afd-fafsds hex removes hyphen
+            user_id=row["user_id"].hex,
             username=row["username"],
-            password_hash=row["password_hash"],
+            email=row["email"],
+            google_sub=row["google_sub"],
             scopes=[AccessScope(s) for s in row["scopes"]],
             plan_type=row["plan_type"],
             storage_used_bytes=row["storage_used_bytes"],
@@ -124,7 +152,7 @@ class UserRepository:
             UPDATE users
             SET storage_used_bytes = storage_used_bytes + $2
             WHERE user_id = $1
-            RETURNING user_id, username, password_hash, scopes, plan_type, storage_used_bytes, created_at
+            RETURNING user_id, username, email, google_sub, scopes, plan_type, storage_used_bytes, created_at
             """,
             user_id,
             filesize,
@@ -134,7 +162,8 @@ class UserRepository:
         return UserRow(
             user_id=row["user_id"].hex,
             username=row["username"],
-            password_hash=row["password_hash"],
+            email=row["email"],
+            google_sub=row["google_sub"],
             scopes=[AccessScope(s) for s in row["scopes"]],
             plan_type=row["plan_type"],
             storage_used_bytes=row["storage_used_bytes"],
