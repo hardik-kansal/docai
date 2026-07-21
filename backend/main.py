@@ -105,6 +105,7 @@ def s3_start() -> boto3.client:
     logger.info("connecting to s3")
     client: boto3.client = boto3.client(
         "s3",
+        endpoint_url=settings().MINIO_URL,
         region_name=settings().minio_region,
         config=Config(
             max_pool_connections=50,

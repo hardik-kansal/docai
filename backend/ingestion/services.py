@@ -89,3 +89,6 @@ class DocService:
         self, document_id: uuid.UUID, status: str, error: str | None = None
     ) -> None:
         await self._repo.update_document_status(document_id, status, error)
+
+    async def hard_delete_document(self, document_id: str) -> None:
+        await self._repo.hard_delete_document(uuid.UUID(document_id))

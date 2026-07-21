@@ -23,6 +23,7 @@ from qdrant_client.models import PointStruct
 from ..config import settings
 from ..dependencies import call_with_retry
 from ..auth.dependencies import get_redis_pool
+from qdrant_client.models import Filter, FieldCondition, MatchValue
 
 
 logger = logging.getLogger(__name__)
@@ -58,10 +59,12 @@ class _BaseIngestionTask(Task):
 
 # crates celelry task class, with run() func running this function
 @celery_app.task(
-    bind=True,  # celery now attaches self in args.
+    bind=True,  # celery now attaches self in args, to get task_id
     base=_BaseIngestionTask,
     name="ingestion.tasks.process_document_task",
     queue="ingestion",
+    # all these are already set in celery_app, but overides it now
+    # for this task only
     acks_late=True,
     max_retries=3,
     default_retry_delay=30,
@@ -234,6 +237,73 @@ def process_document_task(
 
     finally:
         os.unlink(local_path)
+
+
+@celery_app.task(
+    bind=True,
+    base=_BaseIngestionTask,
+    name="ingestion.tasks.delete_document_task",
+    queue="ingestion",
+    acks_late=True,
+    max_retries=3,
+    default_retry_delay=30,
+)
+def delete_document_task(
+    self: Task,
+    doc_id: str,
+    s3_bucket: str,
+    s3_key: str,
+):
+    async def _delete():
+        # S3 delete operations are designed to be idempotent
+        # so it returns 204 no content not error
+        try:
+            get_boto3_client().delete_object(Bucket=s3_bucket, Key=s3_key)
+            logger.info("Deleted S3 object bucket=%s key=%s", s3_bucket, s3_key)
+        except Exception as exc:
+            logger.error("S3 delete failed key=%s: %s", s3_key, exc)
+            raise  # triggers Celery retry
+
+        # Qdrant
+        try:
+            vector_pool = get_vectorPool()
+            await call_with_retry(
+                vector_pool.delete,
+                budget_s=10,
+                collection_name=settings().COLLECTION,
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="document_id",
+                            match=MatchValue(value=doc_id),
+                        )
+                    ]
+                ),
+                wait=True,
+            )
+            logger.info("Deleted Qdrant points for document_id=%s", doc_id)
+        except Exception as exc:
+            logger.error("Qdrant delete failed document_id=%s: %s", doc_id, exc)
+            raise
+
+        # Postgres (chunks + document row)
+        try:
+            doc_service = get_DocService()
+            await doc_service.hard_delete_document(doc_id)
+            logger.info("Hard-deleted Postgres rows for document_id=%s", doc_id)
+        except Exception as exc:
+            logger.error("Postgres delete failed document_id=%s: %s", doc_id, exc)
+            raise
+
+        message = {
+            "document_id": doc_id,
+            "status": "deleted",
+        }
+        await get_redis_pool().publish(
+            settings().REDIS_CHANNEL_DOCS, json.dumps(message)
+        )
+
+    asyncio.get_event_loop().run_until_complete(_delete())
 
 
 """

@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # MinIO / S3
     minio_bucket: str
     minio_region: str
+    MINIO_URL: str
     MINIO_NOTIFY_WEBHOOK_AUTH_TOKEN_FASTAPI: str
 
     # Ingestion limits

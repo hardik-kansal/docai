@@ -207,6 +207,15 @@ class DocRepository:
             user_id,
         )
 
+    async def hard_delete_document(self, document_id: uuid.UUID) -> None:
+        """Permanently remove the document row from Postgres.
+        Chunks are wiped automatically via ON DELETE CASCADE.
+        """
+        await self._pool.execute(
+            "DELETE FROM documents WHERE id = $1;",
+            document_id,
+        )
+
 
 """
 

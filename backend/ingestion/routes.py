@@ -10,7 +10,7 @@ from ..models.document import PresignedURLResponse, DocumentResponse
 
 from typing import Annotated
 from .storage import generate_presigned_post_url, generate_presigned_get_url
-from .tasks import process_document_task
+from .tasks import process_document_task, delete_document_task
 from ..auth.dependencies import (
     get_current_user,
     User,
@@ -18,7 +18,8 @@ from ..auth.dependencies import (
     AuthService,
     get_redis_pool,
 )
-from .dependencies import get_DocService
+
+from .dependencies import get_DocService, get_boto3_client
 from .services import DocService
 import uuid
 from sse_starlette.sse import EventSourceResponse
@@ -48,6 +49,50 @@ async def list_documents(
         )
         for row in rows
     ]
+
+
+# Returns 202 Accepted — cleanup is in flight, not yet complete.
+@router.delete("/documents/{document_id}", status_code=202)
+async def delete_document(
+    document_id: str,
+    user: Annotated[User, Depends(get_current_user)],
+    doc_service: Annotated[DocService, Depends(get_DocService)],
+    authService: Annotated[AuthService, Depends(get_auth_service)],
+):
+    result = await doc_service.get_s3_key(document_id, user.user_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="document not found")
+
+    s3_key = result
+
+    try:
+        head = get_boto3_client().head_object(Bucket=settings.minio_bucket, Key=s3_key)
+        file_size_bytes = head.get("ContentLength", 0)
+    except Exception:
+        logger.warning(
+            "head_object failed for key=%s, skipping storage decrement", s3_key
+        )
+        file_size_bytes = 0
+
+    if file_size_bytes > 0:
+        updated_user = await authService.update_storage(user.user_id, -file_size_bytes)
+        if updated_user:
+            storage_message = {
+                "user_id": str(updated_user.user_id),
+                "storage_used_bytes": updated_user.storage_used_bytes,
+                "type": "storage_update",
+            }
+            await get_redis_pool().publish(
+                settings.REDIS_CHANNEL_DOCS, json.dumps(storage_message)
+            )
+
+    delete_document_task.delay(
+        doc_id=document_id,
+        s3_bucket=settings.minio_bucket,
+        s3_key=s3_key,
+    )
+
+    return {"detail": "deletion in progress", "document_id": document_id}
 
 
 @router.get("/documents/{document_id}/view-url")
